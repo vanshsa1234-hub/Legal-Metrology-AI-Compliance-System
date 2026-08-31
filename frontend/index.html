@@ -1,1 +1,1467 @@
-<!-- code here -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legal Lens — AI-Assisted Product Compliance & Inspection</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1090;"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark navbar-legallens sticky-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#" data-navigate="login">
+        <i class="bi bi-shield-check text-primary fs-4"></i>
+        <span>Legal Lens</span>
+        <span class="brand-badge">SIH Prototype</span>
+      </a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <!-- Consumer User Navigation -->
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0 d-none" id="nav-user-items">
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="user-dashboard" data-target="user-dashboard">
+              <i class="bi bi-speedometer2 me-1"></i>Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="scan-product" data-target="scan-product">
+              <i class="bi bi-upc-scan me-1"></i>Scan Product
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="user-reports" data-target="user-reports">
+              <i class="bi bi-file-earmark-medical me-1"></i>My Reports
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="user-requests" data-target="user-requests">
+              <i class="bi bi-flag me-1"></i>My Requests
+            </a>
+          </li>
+        </ul>
+
+        <!-- Officer / Admin Navigation -->
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0 d-none" id="nav-officer-items">
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="officer-dashboard" data-target="officer-dashboard">
+              <i class="bi bi-graph-up-arrow me-1"></i>Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="officer-requests" data-target="officer-requests">
+              <i class="bi bi-inbox-fill me-1"></i>Raised Requests
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="officer-inspections" data-target="officer-inspections">
+              <i class="bi bi-search me-1"></i>Inspections
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="officer-products" data-target="officer-products">
+              <i class="bi bi-box-seam me-1"></i>Products
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="officer-reports" data-target="officer-reports">
+              <i class="bi bi-file-earmark-pdf me-1"></i>Reports
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="officer-rules" data-target="officer-rules">
+              <i class="bi bi-book-half me-1"></i>Rule Repository (26)
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-navigate="officer-audit" data-target="officer-audit">
+              <i class="bi bi-clock-history me-1"></i>Audit Trail
+            </a>
+          </li>
+        </ul>
+
+        <!-- User Profile & Logout -->
+        <div class="d-flex align-items-center gap-2">
+          <div id="user-profile-chip" class="user-chip d-none">
+            <i class="bi bi-person-badge text-info fs-5"></i>
+            <div>
+              <div class="fw-semibold lh-1" id="user-display-name">Rahul Sharma</div>
+              <small class="extra-small text-muted" id="user-role-badge">Consumer</small>
+            </div>
+            <button class="btn btn-xs btn-outline-light ms-2" id="btn-logout" title="Logout">
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
+          </div>
+
+          <button class="btn btn-sm btn-outline-light d-none" id="nav-login-btn" data-navigate="login">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Login
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Application Container -->
+  <main class="app-container">
+
+    <!-- ============================================================== -->
+    <!-- VIEW: LOGIN                                                    -->
+    <!-- ============================================================== -->
+    <section id="view-login" class="view-section">
+      <div class="row justify-content-center py-4">
+        <div class="col-12 col-md-7 col-lg-5">
+          <div class="card-custom p-4 p-md-5">
+            <div class="text-center mb-4">
+              <div class="d-inline-flex p-3 rounded-circle bg-primary bg-opacity-10 text-primary mb-3">
+                <i class="bi bi-shield-check fs-1"></i>
+              </div>
+              <h3 class="fw-bold mb-1">Legal Lens</h3>
+              <p class="text-muted small">AI-Assisted Consumer Compliance & Product Inspection</p>
+            </div>
+
+            <form id="form-login">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Email Address / Username</label>
+                <input type="email" class="form-control" id="login-email" required placeholder="user@legallens.demo">
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Password</label>
+                <input type="password" class="form-control" id="login-password" required placeholder="••••••••">
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label small fw-semibold">Role</label>
+                <select class="form-select" id="login-role">
+                  <option value="user">Consumer / Field User</option>
+                  <option value="officer">Enforcement Officer / Admin</option>
+                </select>
+              </div>
+
+              <button type="submit" class="btn btn-gov-primary w-100 py-2">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Sign In to Legal Lens
+              </button>
+            </form>
+
+            <div class="mt-4 pt-3 border-top">
+              <div class="text-muted extra-small text-center mb-2 fw-semibold">QUICK DEMO CREDENTIALS</div>
+              <div class="d-grid gap-2">
+                <button type="button" class="btn btn-xs btn-outline-secondary text-start" id="btn-quick-citizen">
+                  <i class="bi bi-person me-1 text-primary"></i> <b>Citizen:</b> <code>user@legallens.demo</code> / <code>user123</code>
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-secondary text-start" id="btn-quick-officer">
+                  <i class="bi bi-shield-lock me-1 text-danger"></i> <b>Officer:</b> <code>admin@legallens.demo</code> / <code>admin123</code>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: USER DASHBOARD                                           -->
+    <!-- ============================================================== -->
+    <section id="view-user-dashboard" class="view-section d-none">
+      <!-- Welcome Section -->
+      <div class="card-custom p-4 mb-4 bg-primary text-white border-0" style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%) !important;">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <span class="badge bg-primary bg-opacity-50 text-white mb-2">Statutory Verification Engine</span>
+            <h2 class="fw-bold mb-2">Check a product before you trust it.</h2>
+            <p class="text-light text-opacity-75 mb-3">
+              Scan packaged food & consumer commodities to identify potential legal metrology & food safety issues and generate official inspection reports.
+            </p>
+            <button class="btn btn-light text-primary fw-semibold px-4 py-2" data-navigate="scan-product">
+              <i class="bi bi-upc-scan me-2"></i>Scan Product Now
+            </button>
+          </div>
+          <div class="col-md-4 text-center d-none d-md-block">
+            <i class="bi bi-camera-fill display-1 text-light text-opacity-25"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Statistics -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+              <i class="bi bi-upc"></i>
+            </div>
+            <div>
+              <div class="stat-number" id="user-stat-scanned">0</div>
+              <div class="stat-label">Products Scanned</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-icon bg-success bg-opacity-10 text-success">
+              <i class="bi bi-file-earmark-check"></i>
+            </div>
+            <div>
+              <div class="stat-number" id="user-stat-reports">0</div>
+              <div class="stat-label">Reports Generated</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+              <i class="bi bi-flag"></i>
+            </div>
+            <div>
+              <div class="stat-number" id="user-stat-requests">0</div>
+              <div class="stat-label">Requests Raised</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Inspections -->
+      <div class="card-custom">
+        <div class="card-header-custom">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history text-primary"></i>
+            <span>Recent Inspections</span>
+          </div>
+          <button class="btn btn-sm btn-outline-primary" data-navigate="scan-product">
+            <i class="bi bi-plus-lg me-1"></i>New Inspection
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Inspection ID</th>
+                <th>Product Information</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="user-recent-inspections-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: SCAN PRODUCT WIZARD                                      -->
+    <!-- ============================================================== -->
+    <section id="view-scan-product" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Multi-Step Product Inspection</h4>
+          <p class="text-muted small mb-0">Capture package evidence, detect barcodes, and run rule-based compliance</p>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" data-navigate="user-dashboard">
+          <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+        </button>
+      </div>
+
+      <!-- Stepper Progress Indicator -->
+      <div class="stepper-container">
+        <div class="step-item active" id="stepper-node-1">
+          <div class="step-circle">1</div>
+          <div class="step-label">Product Photos</div>
+        </div>
+        <div class="step-item" id="stepper-node-2">
+          <div class="step-circle">2</div>
+          <div class="step-label">Barcode / QR</div>
+        </div>
+        <div class="step-item" id="stepper-node-3">
+          <div class="step-circle">3</div>
+          <div class="step-label">Processing</div>
+        </div>
+        <div class="step-item" id="stepper-node-4">
+          <div class="step-circle">4</div>
+          <div class="step-label">Structured Record</div>
+        </div>
+        <div class="step-item" id="stepper-node-5">
+          <div class="step-circle">5</div>
+          <div class="step-label">Compliance Result</div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Product Photos -->
+      <div id="scan-step-1" class="card-custom p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h5 class="fw-bold mb-1"><i class="bi bi-camera me-2 text-primary"></i>Capture Product Packaging</h5>
+            <p class="text-muted small mb-0">Capture clear images of the product packaging. Make sure text & declarations are readable.</p>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btn-load-demo-images">
+            <i class="bi bi-magic me-1"></i>Load Demo Sample (CrunchBite Chips)
+          </button>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <!-- Front (Required) -->
+          <div class="col-6 col-md-4">
+            <label class="form-label small fw-semibold text-danger">Front Package *</label>
+            <div class="upload-box" id="dropzone-front" onclick="document.getElementById('upload-front').click()">
+              <i class="bi bi-camera fs-2 text-muted mb-2 d-block"></i>
+              <div class="fw-semibold small">Capture FRONT</div>
+              <div class="text-muted extra-small">(Required)</div>
+            </div>
+            <input type="file" id="upload-front" class="d-none" accept="image/*">
+          </div>
+
+          <!-- Back (Required) -->
+          <div class="col-6 col-md-4">
+            <label class="form-label small fw-semibold text-danger">Back Package *</label>
+            <div class="upload-box" id="dropzone-back" onclick="document.getElementById('upload-back').click()">
+              <i class="bi bi-camera fs-2 text-muted mb-2 d-block"></i>
+              <div class="fw-semibold small">Capture BACK</div>
+              <div class="text-muted extra-small">(Required)</div>
+            </div>
+            <input type="file" id="upload-back" class="d-none" accept="image/*">
+          </div>
+
+          <!-- Left (Optional) -->
+          <div class="col-6 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Left Side</label>
+            <div class="upload-box" id="dropzone-left" onclick="document.getElementById('upload-left').click()">
+              <i class="bi bi-camera fs-2 text-muted mb-2 d-block"></i>
+              <div class="fw-semibold small">Capture LEFT</div>
+              <div class="text-muted extra-small">(Optional)</div>
+            </div>
+            <input type="file" id="upload-left" class="d-none" accept="image/*">
+          </div>
+
+          <!-- Right (Optional) -->
+          <div class="col-6 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Right Side</label>
+            <div class="upload-box" id="dropzone-right" onclick="document.getElementById('upload-right').click()">
+              <i class="bi bi-camera fs-2 text-muted mb-2 d-block"></i>
+              <div class="fw-semibold small">Capture RIGHT</div>
+              <div class="text-muted extra-small">(Optional)</div>
+            </div>
+            <input type="file" id="upload-right" class="d-none" accept="image/*">
+          </div>
+
+          <!-- Top (Optional) -->
+          <div class="col-6 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Top Panel</label>
+            <div class="upload-box" id="dropzone-top" onclick="document.getElementById('upload-top').click()">
+              <i class="bi bi-camera fs-2 text-muted mb-2 d-block"></i>
+              <div class="fw-semibold small">Capture TOP</div>
+              <div class="text-muted extra-small">(Optional)</div>
+            </div>
+            <input type="file" id="upload-top" class="d-none" accept="image/*">
+          </div>
+
+          <!-- Bottom (Optional) -->
+          <div class="col-6 col-md-4">
+            <label class="form-label small fw-semibold text-muted">Bottom Panel</label>
+            <div class="upload-box" id="dropzone-bottom" onclick="document.getElementById('upload-bottom').click()">
+              <i class="bi bi-camera fs-2 text-muted mb-2 d-block"></i>
+              <div class="fw-semibold small">Capture BOTTOM</div>
+              <div class="text-muted extra-small">(Optional)</div>
+            </div>
+            <input type="file" id="upload-bottom" class="d-none" accept="image/*">
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-gov-primary px-4" id="btn-step1-next">
+            Next: Barcode Scanner <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: Barcode / QR Scanning -->
+      <div id="scan-step-2" class="card-custom p-4 d-none">
+        <h5 class="fw-bold mb-1"><i class="bi bi-upc me-2 text-primary"></i>Scan Product Barcode / EAN</h5>
+        <p class="text-muted small mb-4">Scan the barcode on the package, upload an image, or enter the code manually.</p>
+
+        <div class="row g-4 mb-4">
+          <div class="col-md-6">
+            <div class="border rounded p-4 text-center bg-light">
+              <i class="bi bi-qr-code-scan display-3 text-secondary mb-3 d-block"></i>
+              <div class="fw-semibold mb-1">Barcode Detection Camera</div>
+              <p class="text-muted extra-small mb-3">Position barcode inside camera frame</p>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('upload-barcode-file').click()">
+                <i class="bi bi-upload me-1"></i>Upload Barcode Image
+              </button>
+              <input type="file" id="upload-barcode-file" class="d-none" accept="image/*">
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Manual Barcode Entry (Fallback)</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-upc"></i></span>
+                <input type="text" class="form-control" id="input-barcode-manual" placeholder="8901234567890" value="8901234567890">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label extra-small text-muted fw-semibold">DEMO QUICK SELECTORS</label>
+              <div class="d-grid gap-2">
+                <button type="button" class="btn btn-xs btn-outline-secondary text-start btn-demo-barcode" data-barcode="8901234567890">
+                  <i class="bi bi-tag text-primary me-1"></i> <b>8901234567890</b> — CrunchBite Classic Potato Chips (Issues)
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-secondary text-start btn-demo-barcode" data-barcode="8901030383812">
+                  <i class="bi bi-tag text-success me-1"></i> <b>8901030383812</b> — FreshFarm Whole Wheat Atta (Compliant)
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-secondary text-start btn-demo-barcode" data-barcode="8901456789012">
+                  <i class="bi bi-tag text-info me-1"></i> <b>8901456789012</b> — PureDrop Drinking Water (Compliant)
+                </button>
+              </div>
+            </div>
+
+            <div id="barcode-detected-alert" class="alert alert-success d-flex align-items-center gap-2 p-2">
+              <i class="bi bi-check-circle-fill"></i>
+              <div>Barcode detected: <strong id="detected-barcode-text">8901234567890</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <button class="btn btn-gov-secondary" id="btn-step2-prev">
+            <i class="bi bi-arrow-left me-1"></i> Back
+          </button>
+          <button class="btn btn-gov-primary px-4" id="btn-step2-submit">
+            <i class="bi bi-cpu me-1"></i> Run AI Compliance Engine
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Processing Pipeline Animation -->
+      <div id="scan-step-3" class="card-custom p-5 text-center d-none">
+        <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+        <h4 class="fw-bold mb-1">Analyzing Product Packaging</h4>
+        <p class="text-muted small mb-4">Executing multi-stage OCR extraction and deterministic legal rule evaluations...</p>
+
+        <div class="progress mb-4" style="height: 10px; max-width: 600px; margin: 0 auto;">
+          <div id="processing-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 15%">15%</div>
+        </div>
+
+        <div class="text-start p-3 bg-light rounded mx-auto" style="max-width: 600px;" id="processing-steps-list">
+          <!-- Dynamic progress rows -->
+        </div>
+      </div>
+
+      <!-- STEP 4: Structured Product Record -->
+      <div id="scan-step-4" class="card-custom p-4 d-none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <span class="badge bg-success mb-1"><i class="bi bi-check2-circle me-1"></i>OCR & NER Extraction Complete</span>
+            <h5 class="fw-bold mb-0">Structured Product Record (Evidence-First)</h5>
+          </div>
+          <div class="badge bg-light text-dark border p-2">
+            Inspection: <strong id="struct-inspection-code">LL-INS-2026-0001</strong>
+          </div>
+        </div>
+
+        <!-- Product Summary Header -->
+        <div class="card p-3 mb-3 bg-light border">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <small class="text-muted d-block">Product Name</small>
+              <strong id="struct-prod-name">CrunchBite Classic Potato Chips</strong>
+            </div>
+            <div class="col-md-3">
+              <small class="text-muted d-block">Brand</small>
+              <strong id="struct-brand">CrunchBite Foods</strong>
+            </div>
+            <div class="col-md-3">
+              <small class="text-muted d-block">Category</small>
+              <strong id="struct-category">Packaged Food</strong>
+            </div>
+            <div class="col-md-3">
+              <small class="text-muted d-block">Barcode / EAN</small>
+              <code id="struct-barcode">8901234567890</code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Declarations Table -->
+        <div class="table-responsive mb-4">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Mandatory Declaration</th>
+                <th>Detected Value</th>
+                <th>Confidence</th>
+                <th>Source Image</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="structured-declarations-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-gov-primary px-4" id="btn-continue-to-results">
+            View Compliance Findings <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 5: Compliance Result Screen -->
+      <div id="scan-step-5" class="d-none">
+        <!-- Top Status Banner -->
+        <div id="results-overall-banner" class="card-custom p-4 mb-4">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <span class="text-muted extra-small text-uppercase fw-bold">Automated Screening Outcome</span>
+              <div id="results-overall-status" class="fs-4 fw-bold">POTENTIAL NON-COMPLIANCE DETECTED</div>
+              <p class="text-muted small mb-0 mt-1">
+                AI screening complete. Findings are explainable and mapped to official FSSAI & Legal Metrology provisions.
+              </p>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-primary" id="btn-download-result-pdf">
+                <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF Report
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Statistics Counters -->
+        <div class="row g-3 mb-4">
+          <div class="col-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-number" id="stat-rules-checked">6</div>
+              <div class="stat-label">Rules Evaluated</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card text-success">
+              <div class="stat-number text-success" id="stat-no-issue">4</div>
+              <div class="stat-label">No Issue Detected</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card text-warning">
+              <div class="stat-number text-warning" id="stat-review-req">1</div>
+              <div class="stat-label">Review Required</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-card text-danger">
+              <div class="stat-number text-danger" id="stat-non-comp">1</div>
+              <div class="stat-label">Potential Issues</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Raise Request Banner (If Non-Compliance) -->
+        <div id="results-request-cta-banner" class="alert alert-danger d-flex justify-content-between align-items-center p-3 mb-4 shadow-sm">
+          <div>
+            <div class="fw-bold"><i class="bi bi-exclamation-octagon-fill me-2"></i>Potential Compliance Issue Found</div>
+            <small>Would you like to raise a citizen request for designated enforcement officer review?</small>
+          </div>
+          <button class="btn btn-danger btn-sm px-3" id="btn-raise-request-from-result">
+            <i class="bi bi-flag-fill me-1"></i>Raise a Request
+          </button>
+        </div>
+
+        <!-- Rule-by-Rule Results Table -->
+        <div class="card-custom mb-4">
+          <div class="card-header-custom">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-shield-check text-primary"></i>
+              <span>Statutory Rule-by-Rule Findings (Master Repository Backed)</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-custom align-middle">
+              <thead>
+                <tr>
+                  <th>Rule ID</th>
+                  <th>Requirement & Finding</th>
+                  <th>Evaluation</th>
+                  <th>Confidence</th>
+                  <th>Evidence</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="results-rules-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <button class="btn btn-gov-secondary" data-navigate="user-dashboard">
+            <i class="bi bi-house me-1"></i>Back to Dashboard
+          </button>
+          <button class="btn btn-gov-primary" data-navigate="scan-product">
+            <i class="bi bi-plus-lg me-1"></i>Scan Another Product
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: RAISE REQUEST / COMPLAINT FORM                           -->
+    <!-- ============================================================== -->
+    <section id="view-raise-request" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Raise Compliance Request</h4>
+          <p class="text-muted small mb-0">Submit packaging evidence and location details to designated Metrology & Food Safety Officers</p>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" data-navigate="user-dashboard">
+          <i class="bi bi-arrow-left me-1"></i>Cancel
+        </button>
+      </div>
+
+      <div class="card-custom p-4">
+        <form id="form-raise-request">
+          <!-- Section 1: Product Details -->
+          <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">1. Product Information</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Product Name *</label>
+              <input type="text" class="form-control" id="req-product-name" required value="CrunchBite Classic Potato Chips">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Brand</label>
+              <input type="text" class="form-control" id="req-brand" value="CrunchBite">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Barcode / EAN</label>
+              <input type="text" class="form-control" id="req-barcode" value="8901234567890">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small fw-semibold">MRP Printed</label>
+              <input type="text" class="form-control" id="req-mrp" value="₹50">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Purchase Date</label>
+              <input type="text" class="form-control" id="req-purchase-date" value="24 Aug 2026">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label small fw-semibold">Place of Purchase / Market</label>
+              <input type="text" class="form-control" id="req-place-purchase" placeholder="e.g. Paltan Bazaar, Dehradun" value="Paltan Bazaar Market">
+            </div>
+          </div>
+
+          <!-- Section 2: Shop & Location Details -->
+          <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+            <h6 class="fw-bold text-primary mb-0">2. Retailer / Shop Information</h6>
+            <button type="button" class="btn btn-xs btn-outline-primary" id="btn-get-gps-location">
+              <i class="bi bi-geo-alt-fill me-1"></i>Use Current GPS Location
+            </button>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Shop / Store Name *</label>
+              <input type="text" class="form-control" id="req-shop-name" required placeholder="e.g. Gupta Provision Store" value="Gupta Provision & General Store">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Market / Commercial Area</label>
+              <input type="text" class="form-control" id="req-market-area" placeholder="e.g. Main Market" value="Main Paltan Bazaar">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Complete Shop Address *</label>
+              <input type="text" class="form-control" id="req-shop-address" required placeholder="Shop No, Street, Landmark" value="Shop 14, Main Road, Paltan Bazaar, Dehradun, Uttarakhand 248001">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">City *</label>
+              <input type="text" class="form-control" id="req-city" required value="Dehradun">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">State *</label>
+              <input type="text" class="form-control" id="req-state" required value="Uttarakhand">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label extra-small text-muted">Latitude</label>
+              <input type="text" class="form-control form-control-sm" id="req-latitude" placeholder="30.3165" value="30.3165">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label extra-small text-muted">Longitude</label>
+              <input type="text" class="form-control form-control-sm" id="req-longitude" placeholder="78.0322" value="78.0322">
+            </div>
+          </div>
+
+          <!-- Section 3: Citizen Contact & Complaint -->
+          <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">3. Citizen Details & Description</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Your Name *</label>
+              <input type="text" class="form-control" id="req-citizen-name" required value="Rahul Sharma">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Contact Mobile Number *</label>
+              <input type="tel" class="form-control" id="req-citizen-phone" required value="+91 98765 43210">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Email Address</label>
+              <input type="email" class="form-control" id="req-citizen-email" value="rahul.sharma@email.demo">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Preferred Contact Mode</label>
+              <select class="form-select" id="req-preferred-contact">
+                <option value="Phone">Phone Call</option>
+                <option value="Email">Email</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Priority Level</label>
+              <select class="form-select" id="req-priority">
+                <option value="High">High Priority</option>
+                <option value="Urgent">Urgent / Safety Issue</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Issue Observed / Description *</label>
+              <textarea class="form-control" id="req-description" rows="3" required placeholder="Describe the compliance issue observed (e.g. missing trans fat declaration, illegible batch number, overcharging above MRP)...">I purchased this packet of CrunchBite potato chips today. The nutritional table on the back is blurry, incomplete, and missing mandatory trans-fat and added sugars breakdown. Please inspect the distributor batch.</textarea>
+            </div>
+          </div>
+
+          <!-- Section 4: Supporting Evidence Photos -->
+          <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">4. Supporting Evidence</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Shop Storefront Photograph</label>
+              <input type="file" class="form-control" id="req-shop-photo" accept="image/*">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Bill / Cash Receipt Photo</label>
+              <input type="file" class="form-control" id="req-bill-photo" accept="image/*">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">Additional Evidence</label>
+              <input type="file" class="form-control" id="req-extra-photo" accept="image/*">
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-gov-secondary" data-navigate="user-dashboard">Cancel</button>
+            <button type="submit" class="btn btn-gov-primary px-4">
+              <i class="bi bi-send-fill me-1"></i>Submit Request for Officer Review
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: USER MY REPORTS                                          -->
+    <!-- ============================================================== -->
+    <section id="view-user-reports" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">My Inspection Reports</h4>
+          <p class="text-muted small mb-0">History of all products scanned and certified reports generated</p>
+        </div>
+        <button class="btn btn-gov-primary btn-sm" data-navigate="scan-product">
+          <i class="bi bi-plus-lg me-1"></i>Scan New Product
+        </button>
+      </div>
+
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Inspection ID</th>
+                <th>Product Details</th>
+                <th>Inspection Date</th>
+                <th>Status</th>
+                <th>Confidence</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="user-reports-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: USER MY REQUESTS                                         -->
+    <!-- ============================================================== -->
+    <section id="view-user-requests" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">My Raised Requests</h4>
+          <p class="text-muted small mb-0">Track live enforcement status of compliance complaints submitted to officers</p>
+        </div>
+        <button class="btn btn-gov-primary btn-sm" data-navigate="scan-product">
+          <i class="bi bi-plus-lg me-1"></i>Raise New Request
+        </button>
+      </div>
+
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>Product & Location</th>
+                <th>Submitted Date</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="user-requests-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: OFFICER / ADMIN DASHBOARD                                -->
+    <!-- ============================================================== -->
+    <section id="view-officer-dashboard" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Legal Lens — Enforcement Officer Workspace</h4>
+          <p class="text-muted small mb-0">AI-Assisted Compliance Screening & Statutory Decision Support System</p>
+        </div>
+        <div class="badge bg-primary px-3 py-2">
+          <i class="bi bi-shield-check me-1"></i>Northern Enforcement Zone
+        </div>
+      </div>
+
+      <!-- Executive Statistics Cards -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div>
+              <div class="stat-number" id="admin-stat-inspections">0</div>
+              <div class="stat-label">Total Inspections</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div>
+              <div class="stat-number text-success" id="admin-stat-no-issue">0</div>
+              <div class="stat-label">No Issue Detected</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div>
+              <div class="stat-number text-warning" id="admin-stat-review">0</div>
+              <div class="stat-label">Review Required</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div>
+              <div class="stat-number text-danger" id="admin-stat-non-comp">0</div>
+              <div class="stat-label">Non-Compliance</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div>
+              <div class="stat-number text-primary" id="admin-stat-requests">0</div>
+              <div class="stat-label">Requests Raised</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div>
+              <div class="stat-number text-info" id="admin-stat-cases-active">0</div>
+              <div class="stat-label">Cases in Review</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics Charts -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card-custom p-3 h-100">
+            <h6 class="fw-bold mb-3 small"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Compliance Status Distribution</h6>
+            <div style="height: 220px; position: relative;">
+              <canvas id="chart-compliance-dist"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card-custom p-3 h-100">
+            <h6 class="fw-bold mb-3 small"><i class="bi bi-activity text-primary me-2"></i>Inspection Volume Trend</h6>
+            <div style="height: 220px; position: relative;">
+              <canvas id="chart-inspections-trend"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card-custom p-3 h-100">
+            <h6 class="fw-bold mb-3 small"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Inspected Product Categories</h6>
+            <div style="height: 220px; position: relative;">
+              <canvas id="chart-categories-bar"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Citizen Complaints Queue -->
+      <div class="card-custom">
+        <div class="card-header-custom">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-inbox-fill text-primary"></i>
+            <span>Active Citizen Requests Queue</span>
+          </div>
+          <button class="btn btn-sm btn-outline-primary" data-navigate="officer-requests">
+            View All Requests <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>Product & Store</th>
+                <th>Location</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-recent-requests-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: OFFICER RAISED REQUESTS LIST                             -->
+    <!-- ============================================================== -->
+    <section id="view-officer-requests" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Raised Citizen Compliance Requests</h4>
+          <p class="text-muted small mb-0">Filter and review citizen inspection requests for field investigation</p>
+        </div>
+      </div>
+
+      <!-- Filter Controls -->
+      <div class="card-custom p-3 mb-3">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input type="text" class="form-control" id="search-officer-req" placeholder="Search by product, shop, or ID..." oninput="loadOfficerRequests()">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <select class="form-select form-select-sm" id="filter-officer-req-status" onchange="loadOfficerRequests()">
+              <option value="All">All Statuses</option>
+              <option value="Submitted">Submitted</option>
+              <option value="Under Review">Under Review</option>
+              <option value="Action Initiated">Action Initiated</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-select form-select-sm" id="filter-officer-req-priority" onchange="loadOfficerRequests()">
+              <option value="All">All Priorities</option>
+              <option value="Urgent">Urgent</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-sm btn-outline-secondary w-100" onclick="loadOfficerRequests()">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Requests Table -->
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>Product</th>
+                <th>Citizen</th>
+                <th>Shop & City</th>
+                <th>Date</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="officer-requests-table-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: OFFICER CASE REVIEW DETAIL (HUMAN-IN-THE-LOOP)            -->
+    <!-- ============================================================== -->
+    <section id="view-officer-request-detail" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-sm btn-outline-secondary" data-navigate="officer-requests">
+            <i class="bi bi-arrow-left me-1"></i>Back
+          </button>
+          <div>
+            <h4 class="fw-bold mb-0">Case Review: <span id="case-code-title" class="text-primary">LL-REQ-2026-0001</span></h4>
+            <span class="badge bg-warning text-dark me-1" id="case-status-badge">Submitted</span>
+            <span class="badge bg-danger" id="case-priority-badge">High Priority</span>
+          </div>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" id="btn-case-download-report">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Download Inspection PDF
+        </button>
+      </div>
+
+      <div class="row g-3">
+        <!-- Left: Case Evidence & Info -->
+        <div class="col-md-7">
+          <!-- Citizen & Shop Info -->
+          <div class="card-custom p-3 mb-3">
+            <h6 class="fw-bold text-primary border-bottom pb-2 mb-2">Citizen & Location Profile</h6>
+            <div class="row g-2 small">
+              <div class="col-6">
+                <span class="text-muted d-block">Citizen Name</span>
+                <strong id="case-citizen-name">Rahul Sharma</strong>
+              </div>
+              <div class="col-6">
+                <span class="text-muted d-block">Phone / Preferred Contact</span>
+                <strong id="case-citizen-phone">+91 98765 43210</strong> (<span id="case-preferred-contact">Phone</span>)
+              </div>
+              <div class="col-6">
+                <span class="text-muted d-block">Shop / Store</span>
+                <strong id="case-shop-name">Gupta Provision Store</strong>
+              </div>
+              <div class="col-6">
+                <span class="text-muted d-block">City & Market</span>
+                <span id="case-city-state">Dehradun, Uttarakhand</span>
+              </div>
+              <div class="col-12">
+                <span class="text-muted d-block">Address</span>
+                <span id="case-shop-address">Shop 14, Paltan Bazaar, Dehradun</span>
+              </div>
+              <div class="col-12 mt-2">
+                <span class="text-muted d-block">Citizen Complaint Description</span>
+                <div class="p-2 bg-light rounded border text-dark" id="case-description">
+                  Nutritional panel is blurry and missing trans-fat breakdown.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Details Card -->
+          <div class="card-custom p-3 mb-3">
+            <h6 class="fw-bold text-primary border-bottom pb-2 mb-2">Product Metadata</h6>
+            <div class="row g-2 small">
+              <div class="col-6">
+                <span class="text-muted d-block">Product Name</span>
+                <strong id="case-prod-name">CrunchBite Potato Chips</strong>
+              </div>
+              <div class="col-6">
+                <span class="text-muted d-block">Brand</span>
+                <span id="case-prod-brand">CrunchBite</span>
+              </div>
+              <div class="col-6">
+                <span class="text-muted d-block">Barcode</span>
+                <code id="case-prod-barcode">8901234567890</code>
+              </div>
+              <div class="col-6">
+                <span class="text-muted d-block">MRP</span>
+                <span id="case-prod-mrp">₹50</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action History Timeline -->
+          <div class="card-custom p-3">
+            <h6 class="fw-bold text-primary border-bottom pb-2 mb-2">Audit & Officer Actions History</h6>
+            <ul class="list-group list-group-flush" id="case-action-history-list">
+              <!-- Dynamically populated -->
+            </ul>
+          </div>
+        </div>
+
+        <!-- Right: Officer Decision & Human-in-the-Loop Controls -->
+        <div class="col-md-5">
+          <div class="card-custom p-4 border-primary">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <i class="bi bi-person-badge text-primary fs-4"></i>
+              <h5 class="fw-bold mb-0">Officer Decision Panel</h5>
+            </div>
+            <p class="text-muted extra-small mb-3">
+              AI provides screening decision support. You make the formal statutory verification.
+            </p>
+
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Update Case Status *</label>
+              <select class="form-select" id="officer-action-status">
+                <option value="Under Review">Accept for Review (Under Review)</option>
+                <option value="Action Initiated">Action Initiated (Notices / Lab Sampling)</option>
+                <option value="Mark Verified">Mark Verified (No Issue Found)</option>
+                <option value="Mark Non-Compliance Confirmed">Confirm Non-Compliance (Statutory Action)</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label small fw-semibold">Officer Inspection Remarks *</label>
+              <textarea class="form-control" id="officer-action-remarks" rows="4" placeholder="Enter official findings, notice reference numbers, or verification memo notes..."></textarea>
+            </div>
+
+            <button type="button" class="btn btn-gov-primary w-100 py-2" id="btn-save-officer-action">
+              <i class="bi bi-check2-circle me-1"></i> Save Official Action & Update Audit Log
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: RULE REPOSITORY EXPLORER (26 RULES)                      -->
+    <!-- ============================================================== -->
+    <section id="view-officer-rules" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Legal Compliance Rule Repository</h4>
+          <p class="text-muted small mb-0">Directly loaded from <code>SIH_Legal_Compliance_Master.csv</code> (FSSAI & Legal Metrology Act)</p>
+        </div>
+        <span class="badge bg-primary" id="rules-count-badge">26 Rules Active</span>
+      </div>
+
+      <div class="card-custom p-3 mb-3">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input type="text" class="form-control" id="search-rules-input" placeholder="Search rules by ID, title, description..." oninput="loadRuleRepository()">
+            </div>
+          </div>
+          <div class="col-md-4">
+            <select class="form-select form-select-sm" id="filter-rules-category" onchange="loadRuleRepository()">
+              <option value="All">All Categories</option>
+              <option value="Pre-packaged Foods">Pre-packaged Foods</option>
+              <option value="Packaged Water">Packaged Water</option>
+              <option value="Alcoholic Beverages">Alcoholic Beverages</option>
+              <option value="Ayurveda Aahara">Ayurveda Aahara</option>
+              <option value="Probiotic Foods">Probiotic Foods</option>
+              <option value="All Food Businesses">All Food Businesses</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-sm btn-outline-secondary w-100" onclick="loadRuleRepository()">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Rule ID</th>
+                <th>Title & Requirement</th>
+                <th>Category</th>
+                <th>Regulation & Clause</th>
+                <th>Type</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="rules-repository-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: AUDIT TRAIL                                              -->
+    <!-- ============================================================== -->
+    <section id="view-officer-audit" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Immutable Audit Trail</h4>
+          <p class="text-muted small mb-0">Complete chronological event log of all system and officer actions</p>
+        </div>
+      </div>
+
+      <div class="card-custom p-3 mb-3">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <select class="form-select form-select-sm" id="filter-audit-entity" onchange="loadAuditTrail()">
+              <option value="All">All Entities</option>
+              <option value="Inspection">Inspection</option>
+              <option value="Request">Request</option>
+              <option value="Report">Report</option>
+              <option value="Auth">Auth</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <select class="form-select form-select-sm" id="filter-audit-role" onchange="loadAuditTrail()">
+              <option value="All">All Roles</option>
+              <option value="user">Consumer (user)</option>
+              <option value="officer">Officer</option>
+              <option value="System">System</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-sm btn-outline-secondary w-100" onclick="loadAuditTrail()">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh Log
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Timestamp (UTC)</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Details</th>
+                <th>IP Address</th>
+              </tr>
+            </thead>
+            <tbody id="audit-trail-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: OFFICER REPORTS REPOSITORY                               -->
+    <!-- ============================================================== -->
+    <section id="view-officer-reports" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Compliance Reports Repository</h4>
+          <p class="text-muted small mb-0">Archive of all generated PDF inspection records</p>
+        </div>
+      </div>
+
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Report Code</th>
+                <th>Product Name</th>
+                <th>Date</th>
+                <th>Result</th>
+                <th>Summary</th>
+                <th>Download</th>
+              </tr>
+            </thead>
+            <tbody id="officer-reports-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: OFFICER PRODUCTS REPOSITORY                              -->
+    <!-- ============================================================== -->
+    <section id="view-officer-products" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">Inspected Products Catalog</h4>
+          <p class="text-muted small mb-0">Master database of scanned products and packaging records</p>
+        </div>
+      </div>
+
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Product & Manufacturer</th>
+                <th>Brand</th>
+                <th>Category</th>
+                <th>Barcode</th>
+                <th>MRP</th>
+                <th>Net Qty</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="officer-products-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: OFFICER INSPECTIONS LIST                                 -->
+    <!-- ============================================================== -->
+    <section id="view-officer-inspections" class="view-section d-none">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="fw-bold mb-0">All System Inspections</h4>
+          <p class="text-muted small mb-0">Complete historical log of automated inspection runs</p>
+        </div>
+      </div>
+
+      <div class="card-custom">
+        <div class="table-responsive">
+          <table class="table table-custom align-middle">
+            <thead>
+              <tr>
+                <th>Inspection Code</th>
+                <th>Product & Barcode</th>
+                <th>Date</th>
+                <th>Compliance Result</th>
+                <th>Confidence</th>
+                <th>Officer Status</th>
+                <th>Report</th>
+              </tr>
+            </thead>
+            <tbody id="officer-inspections-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: RULE DETAIL                                             -->
+  <!-- ============================================================== -->
+  <div class="modal fade" id="modal-rule-detail" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title fw-bold" id="modal-rule-id">RULE-ID</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <h5 class="fw-bold mb-2 text-primary" id="modal-rule-title">Rule Title</h5>
+          <div class="badge bg-secondary mb-3" id="modal-rule-cat">Category</div>
+
+          <div class="row g-2 mb-3 small bg-light p-3 rounded border">
+            <div class="col-md-6"><b>Applicable Regulation:</b> <span id="modal-rule-reg"></span></div>
+            <div class="col-md-3"><b>Clause:</b> <span id="modal-rule-clause"></span></div>
+            <div class="col-md-3"><b>Version:</b> <span id="modal-rule-version"></span></div>
+            <div class="col-md-6"><b>Effective Date:</b> <span id="modal-rule-effective"></span></div>
+            <div class="col-md-6"><b>Evidence Required:</b> <span id="modal-rule-evidence"></span></div>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="fw-bold small text-dark">Legal Requirement (Statutory Text)</h6>
+            <div class="p-3 bg-white rounded border small" id="modal-rule-req"></div>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="fw-bold small text-dark">Plain English Description</h6>
+            <p class="small text-secondary" id="modal-rule-desc"></p>
+          </div>
+
+          <div class="mb-2">
+            <h6 class="fw-bold small text-dark">Remarks / Exceptions</h6>
+            <p class="extra-small text-muted" id="modal-rule-remarks"></p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: EVIDENCE VIEWER                                         -->
+  <!-- ============================================================== -->
+  <div class="modal fade" id="modal-evidence-viewer" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title fw-bold"><i class="bi bi-bounding-box me-2"></i>Declaration Evidence Viewer</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <div class="mb-3">
+            <h6 class="fw-bold text-primary mb-1" id="modal-evidence-field">Field Name</h6>
+            <div class="small">Detected Value: <strong id="modal-evidence-value">Value</strong></div>
+            <div class="extra-small text-muted">
+              Source: <span id="modal-evidence-src">Front Image</span> &bull; Confidence: <span id="modal-evidence-conf" class="badge bg-success">96%</span>
+            </div>
+          </div>
+          <div class="border rounded p-2 bg-light">
+            <img src="" id="modal-evidence-img" class="img-fluid rounded" alt="Evidence Source Image" style="max-height: 350px;">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container text-center">
+      <div><b>Legal Lens</b> &mdash; Smart India Hackathon Working Prototype</div>
+      <div class="extra-small mt-1 text-muted">
+        AI-Assisted Decision Support &bull; Backed by 26 Master Compliance Rules &bull; Human-in-the-Loop Officer Adjudication
+      </div>
+    </div>
+  </footer>
+
+  <!-- Bootstrap 5 Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Application JS -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

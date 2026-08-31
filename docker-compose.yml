@@ -1,1 +1,18 @@
-# code here
+# Legal Lens - Local Docker Compose
+# Single-service setup matching how the app actually runs today
+# (FastAPI serving both the API and the static frontend). Postgres,
+# Redis, and MinIO are NOT included here because the app doesn't use
+# them yet - see docs/ROADMAP.md before adding them to this file.
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./backend/legallens.db:/app/backend/legallens.db
+    restart: unless-stopped

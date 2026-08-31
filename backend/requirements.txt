@@ -1,1 +1,22 @@
-# code here
+# Legal Lens - Backend Dependencies
+# Every package below is actually imported somewhere in backend/app.
+# Pin versions loosely (>=) for hackathon-speed iteration; pin exactly
+# before any production deployment.
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+sqlalchemy>=2.0.0
+pydantic>=2.6.0
+python-multipart>=0.0.9
+reportlab>=4.1.0
+Pillow>=10.2.0
+
+# --- Testing ---
+httpx>=0.27.0
+
+# --- Planned, not yet used (see docs/ROADMAP.md) ---
+# passlib[bcrypt]      # salted password hashing, replacing core.security.hash_password
+# python-jose[cryptography]  # signed/verifiable JWTs, replacing core.security.generate_session_token
+# celery                # background OCR/AI processing (backend/app/workers/)
+# redis                 # Celery broker
+# alembic                # schema migrations (backend/alembic/)

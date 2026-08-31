@@ -1,63 +1,89 @@
-# ⚖️ Legal Metrology AI Compliance System
+# Legal Lens (MetraAI)
 
-An AI-powered compliance inspection platform that automatically analyzes packaged commodity labels and product images to detect potential violations under India's **Legal Metrology (Packaged Commodities) Rules, 2011**.
+**AI-Assisted Consumer Compliance & Packaged Product Inspection Platform**
+Smart India Hackathon 2026 — Problem Statement 26034
+*Software System to check compliance of Packaged Commodities under Legal Metrology (Packaged Commodities) Rules, 2011.*
 
-The system combines **Computer Vision, OCR, NLP, and a rule-based compliance engine** to extract mandatory declarations, validate them against applicable regulations, identify potential violations, highlight evidence, and generate digital inspection reports.
+Legal Lens helps enforcement officials and citizens check packaged
+products against the Legal Metrology (Packaged Commodities) Rules,
+2011 by extracting label declarations (MRP, net quantity,
+manufacturer, dates, etc.) and evaluating them against a deterministic
+rule engine, producing a clear **No Issue Detected / Review Required /
+Potential Non-Compliance** result with a downloadable PDF report.
 
----
+**Before you rely on this for a demo or a decision: read [docs/ROADMAP.md](docs/ROADMAP.md).**
+It lists exactly what's real and what's still simulated — most
+importantly, the OCR/label extraction layer is currently a demo
+catalog, not live computer vision, and authentication is not yet
+production-grade.
 
-## 🚀 Features
+## Project Structure
 
-- 📷 **AI Product Scanning** — Analyze images of packaged commodities.
-- 🔍 **OCR & Text Extraction** — Extract text and mandatory declarations from labels.
-- 🧠 **AI Information Extraction** — Identify product, manufacturer, MRP, quantity, dates, consumer-care details, etc.
-- ⚖️ **Rule-Based Compliance Engine** — Validate declarations against applicable Legal Metrology requirements.
-- 🚨 **Violation Detection** — Identify missing, incomplete, or potentially non-compliant declarations.
-- 🔠 **Font & Readability Analysis** — Analyze text visibility, readability, and applicable size requirements.
-- 🖼️ **Evidence Highlighting** — Highlight relevant regions of product images.
-- 📊 **Compliance Dashboard** — Monitor inspections, violations, and product status.
-- 📄 **Automated Reports** — Generate digital compliance and inspection reports.
-- 🗂️ **Inspection Repository** — Store and retrieve scanned products and inspection history.
-- 🔐 **Role-Based Access** — Secure access for officers, reviewers, and administrators.
-- 🛒 **E-Commerce Listing Analysis** — Support analysis of online product information and images.
+```
+Legal-Metrology-AI-Compliance-System/
+├── backend/                 FastAPI application
+│   └── app/
+│       ├── core/              config, security
+│       ├── database/          SQLAlchemy base + session
+│       ├── models/            one file per domain entity
+│       ├── schemas/           one file per domain entity (Pydantic)
+│       ├── api/                one router per resource
+│       ├── services/          rule engine, OCR, reports, audit, seeding
+│       └── workers/           reserved for Celery (not yet implemented)
+├── frontend/                 Vanilla JS SPA (Bootstrap 5)
+├── rules/legal_rules/      SIH_Legal_Compliance_Master.csv (rule engine's source of truth)
+├── storage/                    Runtime-generated images, evidence, reports
+├── docs/                        Tech stack, PRD, architecture diagrams, roadmap
+├── tests/backend/          Automated API test suite
+└── docker/                    Container build
+```
 
----
+## Running Locally
 
-## 🧠 How It Works
+```bash
+# from the project root
+pip install -r backend/requirements.txt
+python run_server.py
+```
 
-```text
-                 PRODUCT IMAGE
-                       │
-                       ▼
-              Image Preprocessing
-                       │
-                       ▼
-             Text / Label Detection
-                       │
-                       ▼
-                      OCR
-                       │
-                       ▼
-             Information Extraction
-                       │
-                       ▼
-              Structured Product Data
-                       │
-             ┌─────────┴─────────┐
-             ▼                   ▼
-       Legal Rule Database    Legal RAG
-             │                   │
-             └─────────┬─────────┘
-                       ▼
-              Compliance Engine
-                       │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-       COMPLIANT    VIOLATION     REVIEW
-          │            │            │
-          └────────────┼────────────┘
-                       ▼
-              Evidence & Report
-                       │
-                       ▼
-              Officer Dashboard
+Then open **http://127.0.0.1:8000**.
+
+Demo credentials (seeded automatically on first run):
+- **Citizen:** `user@legallens.demo` / `user123`
+- **Officer/Admin:** `admin@legallens.demo` / `admin123`
+
+## Running with Docker
+
+```bash
+docker compose up --build
+```
+
+## Running the Test Suite
+
+```bash
+python tests/backend/test_api.py
+```
+
+## Why the SPA has no separate HTML pages per route
+
+The frontend is a single-page app (`frontend/index.html` +
+`frontend/js/app.js`) that renders login, dashboard, inspection,
+products, cases, rules, and audit views client-side, rather than as
+separate static HTML files. This was a deliberate choice to keep
+state (auth session, in-progress inspections) consistent across views
+without full page reloads — not an oversight. If the project later
+needs server-rendered routes (e.g. for SEO or multi-page deep
+linking), that's a real, scoped rewrite rather than something to fake
+with empty placeholder pages.
+
+## Tech Stack
+
+See [docs/MetraAI_Final_Tech_Stack.pdf](docs/MetraAI_Final_Tech_Stack.pdf)
+for the full intended architecture. Currently implemented: HTML5/CSS3/JS
++ Bootstrap 5, FastAPI + Pydantic + SQLAlchemy, SQLite, ReportLab. See
+[docs/ROADMAP.md](docs/ROADMAP.md) for what's planned but not yet built
+(PostgreSQL, Celery/Redis, real OCR/CV, JWT auth, object storage).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

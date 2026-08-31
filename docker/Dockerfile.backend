@@ -1,1 +1,22 @@
-# code here
+# Legal Lens - Backend Container
+# Serves the FastAPI app, which also mounts and serves the frontend
+# static files (see backend/app/main.py) - so this single image is
+# enough to run the whole demo.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+COPY backend/ ./backend/
+COPY frontend/ ./frontend/
+COPY rules/ ./rules/
+
+# Storage is created at runtime by backend/app/main.py, but the
+# directory needs to exist inside the image/volume mount point.
+RUN mkdir -p storage/images/products storage/images/shops storage/evidence storage/reports
+
+EXPOSE 8000
+
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
