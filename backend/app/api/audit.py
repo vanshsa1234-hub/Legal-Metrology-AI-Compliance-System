@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import AuditLog
 from ..schemas import AuditLogOut
+from ..core.deps import require_roles
 
 router = APIRouter(prefix="/api/audit", tags=["Audit Trail"])
 
-@router.get("", response_model=List[AuditLogOut])
+@router.get("", response_model=List[AuditLogOut], dependencies=[Depends(require_roles("officer", "admin"))])
 def get_audit_trail(
     entity_type: Optional[str] = None,
     user_role: Optional[str] = None,

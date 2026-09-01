@@ -11,12 +11,29 @@ python-multipart>=0.0.9
 reportlab>=4.1.0
 Pillow>=10.2.0
 
+# --- Real OCR / Computer Vision (added: replaces the old demo catalog) ---
+# NOTE: Tesseract itself is a system binary, not a Python package.
+# Install it via your OS package manager before running the app:
+#   Debian/Ubuntu: apt-get install -y tesseract-ocr
+#   macOS (brew):   brew install tesseract
+opencv-python-headless>=4.9.0
+pytesseract>=0.3.10
+numpy>=1.26.0
+
+# --- Auth (Phase 1: docs/PRODUCTION_READINESS_PRD.md) ---
+passlib[bcrypt]>=1.7.4
+# Pinned <5.0: bcrypt 5.x removed the internal API passlib 1.7.4
+# probes for backend detection, causing a hard crash on import
+# ("password cannot be longer than 72 bytes"). Unpin once passlib
+# ships a release compatible with bcrypt>=5.
+bcrypt>=4.0.1,<5.0.0
+python-jose[cryptography]>=3.3.0
+
 # --- Testing ---
 httpx>=0.27.0
 
-# --- Planned, not yet used (see docs/ROADMAP.md) ---
-# passlib[bcrypt]      # salted password hashing, replacing core.security.hash_password
-# python-jose[cryptography]  # signed/verifiable JWTs, replacing core.security.generate_session_token
+# --- Planned, not yet used (see docs/PRODUCTION_READINESS_PRD.md) ---
 # celery                # background OCR/AI processing (backend/app/workers/)
 # redis                 # Celery broker
 # alembic                # schema migrations (backend/alembic/)
+# paddleocr / paddlepaddle  # upgrade path from Tesseract, per original tech stack doc

@@ -24,10 +24,29 @@ const state = {
 };
 
 // API Base
+function getAuthHeader() {
+  const token = localStorage.getItem('legallens_token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+function handleAuthExpired() {
+  // Token missing/expired/rejected by the backend: clear session and
+  // send the user back to login rather than showing a confusing 401.
+  state.currentUser = null;
+  localStorage.removeItem('legallens_user');
+  localStorage.removeItem('legallens_token');
+  if (typeof updateNavForUser === 'function') updateNavForUser();
+  if (typeof navigate === 'function') navigate('login');
+}
+
 const API = {
   async get(endpoint) {
     try {
-      const res = await fetch(endpoint);
+      const res = await fetch(endpoint, { headers: { ...getAuthHeader() } });
+      if (res.status === 401) {
+        handleAuthExpired();
+        throw new Error('Session expired. Please log in again.');
+      }
       if (!res.ok) throw new Error(await res.text());
       return await res.json();
     } catch (err) {
@@ -41,12 +60,17 @@ const API = {
     try {
       const options = {
         method: 'POST',
-        body: isFormData ? body : JSON.stringify(body)
+        body: isFormData ? body : JSON.stringify(body),
+        headers: { ...getAuthHeader() }
       };
       if (!isFormData) {
-        options.headers = { 'Content-Type': 'application/json' };
+        options.headers['Content-Type'] = 'application/json';
       }
       const res = await fetch(endpoint, options);
+      if (res.status === 401) {
+        handleAuthExpired();
+        throw new Error('Session expired. Please log in again.');
+      }
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(errorData.detail || 'API error');
@@ -64,16 +88,21 @@ const API = {
 document.addEventListener('DOMContentLoaded', () => {
   // Check stored user session
   const storedUser = localStorage.getItem('legallens_user');
-  if (storedUser) {
+  const storedToken = localStorage.getItem('legallens_token');
+  if (storedUser && storedToken) {
     try {
       state.currentUser = JSON.parse(storedUser);
       updateNavForUser();
       navigate(state.currentUser.role === 'officer' ? 'officer-dashboard' : 'user-dashboard');
     } catch (e) {
       localStorage.removeItem('legallens_user');
+      localStorage.removeItem('legallens_token');
       navigate('login');
     }
   } else {
+    // Stale session from before JWT auth was added, or never logged in.
+    localStorage.removeItem('legallens_user');
+    localStorage.removeItem('legallens_token');
     navigate('login');
   }
 
@@ -196,6 +225,7 @@ function setupNavigationEvents() {
     logoutBtn.addEventListener('click', () => {
       state.currentUser = null;
       localStorage.removeItem('legallens_user');
+      localStorage.removeItem('legallens_token');
       updateNavForUser();
       showToast('Logged out successfully', 'info');
       navigate('login');
@@ -249,6 +279,7 @@ function setupLoginForm() {
       const res = await API.post('/api/auth/login', { email, password, role });
       state.currentUser = res.user;
       localStorage.setItem('legallens_user', JSON.stringify(res.user));
+      localStorage.setItem('legallens_token', res.access_token);
       updateNavForUser();
       showToast(`Welcome, ${res.user.full_name}!`, 'success');
       navigate(res.user.role === 'officer' ? 'officer-dashboard' : 'user-dashboard');
@@ -454,7 +485,7 @@ function renderImagePreview(side, dataUrl, filename) {
     box.innerHTML = `
       <img src="${dataUrl}" class="preview-thumb mb-2" alt="${side} package" />
       <div class="fw-semibold small text-success"><i class="bi bi-check-circle me-1"></i>${side.toUpperCase()} Attached</div>
-      <span class="badge bg-success mt-1">Quality: Good (High Res)</span>
+      <span class="badge bg-secondary mt-1">Quality checked during processing</span>
       <div class="mt-2">
         <button type="button" class="btn btn-xs btn-outline-danger" onclick="removeImage('${side}', event)">Remove</button>
       </div>
@@ -476,7 +507,7 @@ function removeImage(side, event) {
   }
 }
 
-function simulateDemoImages() {
+async function simulateDemoImages() {
   // Realistic simulated package artwork for demo
   const frontCanvas = document.createElement('canvas');
   frontCanvas.width = 600; frontCanvas.height = 800;
@@ -506,11 +537,20 @@ function simulateDemoImages() {
   bctx.fillText('Batch: CB24082401  Mfg: 08/2026', 60, 280);
   bctx.fillText('FSSAI Lic. No: 10018012000456', 60, 320);
 
+  // Real JPEG blobs (not an empty placeholder Blob) so the backend's
+  // real OCR pipeline (Phase 1's ROADMAP item) has actual pixel data
+  // to read when this demo path is used, instead of silently getting
+  // zero bytes and falling back to "no images supplied".
+  const [frontBlob, backBlob] = await Promise.all([
+    new Promise(resolve => frontCanvas.toBlob(resolve, 'image/jpeg', 0.92)),
+    new Promise(resolve => backCanvas.toBlob(resolve, 'image/jpeg', 0.92)),
+  ]);
+
   const frontUrl = frontCanvas.toDataURL('image/jpeg');
   const backUrl = backCanvas.toDataURL('image/jpeg');
 
-  state.uploadedImages.front = { dataUrl: frontUrl, file: new Blob() };
-  state.uploadedImages.back = { dataUrl: backUrl, file: new Blob() };
+  state.uploadedImages.front = { dataUrl: frontUrl, file: frontBlob };
+  state.uploadedImages.back = { dataUrl: backUrl, file: backBlob };
 
   renderImagePreview('front', frontUrl, 'crunchbite_front.jpg');
   renderImagePreview('back', backUrl, 'crunchbite_back.jpg');
@@ -520,58 +560,96 @@ function simulateDemoImages() {
 
 // -------------------------------------------------------------
 // 4. Processing Pipeline & Deterministic Compliance Results
+//
+// Every step below is sequenced around a real awaited backend call
+// and reports what that call actually returned - there is no
+// setTimeout-based fake delay or scripted step list left. Genuinely
+// granular progress (e.g. mid-OCR percentage) would need a backend
+// job-status endpoint to poll, which is Phase 4 (Celery/Redis) in
+// docs/PRODUCTION_READINESS_PRD.md; for now, steps that correspond to
+// a single backend request are shown as one in-progress row for the
+// duration of that request.
 // -------------------------------------------------------------
 async function startProcessingPipeline() {
   setScanStep(3);
-
-  const stages = [
-    { text: 'Image quality & lighting verification', delay: 400 },
-    { text: 'Detecting declaration regions & bounding boxes', delay: 500 },
-    { text: 'Extracting package text using OCR & NLP', delay: 600 },
-    { text: 'Validating barcode against product master', delay: 400 },
-    { text: 'Structuring product metadata & declarations', delay: 500 },
-    { text: 'Matching applicable provisions from 26 master rules', delay: 600 },
-    { text: 'Evaluating deterministic legal compliance criteria', delay: 600 },
-    { text: 'Compiling evidence-first report & findings', delay: 400 }
-  ];
 
   const listContainer = document.getElementById('processing-steps-list');
   const progressBar = document.getElementById('processing-progress-bar');
   if (listContainer) listContainer.innerHTML = '';
 
-  for (let i = 0; i < stages.length; i++) {
-    const s = stages[i];
+  function addStepRow(text) {
     const row = document.createElement('div');
     row.className = 'processing-step-row in-progress';
-    row.innerHTML = `<div class="spinner-border spinner-border-sm text-primary"></div><span>${s.text}...</span>`;
+    row.innerHTML = `<div class="spinner-border spinner-border-sm text-primary"></div><span>${text}</span>`;
     listContainer.appendChild(row);
-
-    const percent = Math.round(((i + 1) / stages.length) * 100);
-    if (progressBar) {
-      progressBar.style.width = `${percent}%`;
-      progressBar.textContent = `${percent}%`;
-    }
-
-    await new Promise(r => setTimeout(r, s.delay));
-
-    row.className = 'processing-step-row done';
-    row.innerHTML = `<i class="bi bi-check-circle-fill text-success fs-5"></i><span>${s.text}</span>`;
+    return row;
   }
 
-  // Submit to Backend API
+  function finishStepRow(row, text) {
+    row.className = 'processing-step-row done';
+    row.innerHTML = `<i class="bi bi-check-circle-fill text-success fs-5"></i><span>${text}</span>`;
+  }
+
+  function setProgress(percent) {
+    if (!progressBar) return;
+    progressBar.style.width = `${percent}%`;
+    progressBar.textContent = `${percent}%`;
+  }
+
   try {
-    // 1. Create inspection session
+    // Step 1: create the inspection session (real API call).
+    let row = addStepRow('Creating inspection session...');
     const ins = await API.post('/api/inspections', {
       barcode: state.barcodeData,
       category: 'Packaged Food'
     });
+    finishStepRow(row, `Inspection session created (${ins.inspection_code})`);
+    setProgress(15);
 
-    // 2. Process inspection with rule engine
-    const formData = new FormData();
-    formData.append('barcode', state.barcodeData || '8901234567890');
-    
-    const processed = await API.post(`/api/inspections/${ins.id}/process`, formData, true);
+    // Step 2: upload each captured image and report its REAL quality
+    // score from the backend's OpenCV blur/brightness/contrast check
+    // (OCRService.evaluate_image_quality) - not a scripted delay.
+    const sides = ['front', 'back', 'left', 'right', 'top', 'bottom'];
+    const capturedSides = sides.filter(s => state.uploadedImages[s] && state.uploadedImages[s].file);
+
+    if (capturedSides.length === 0) {
+      row = addStepRow('No package images attached - proceeding on barcode only');
+      finishStepRow(row, 'No package images attached (barcode-only analysis)');
+    }
+
+    for (let i = 0; i < capturedSides.length; i++) {
+      const side = capturedSides[i];
+      row = addStepRow(`Uploading & scoring ${side} image...`);
+
+      const formData = new FormData();
+      formData.append('image_type', side);
+      formData.append('file', state.uploadedImages[side].file, `${side}.jpg`);
+
+      const uploadResult = await API.post(`/api/inspections/${ins.id}/images`, formData, true);
+      finishStepRow(
+        row,
+        `${side.toUpperCase()} image uploaded - quality: ${uploadResult.quality_label} (${uploadResult.quality_score}/100)`
+      );
+      setProgress(15 + Math.round(((i + 1) / capturedSides.length) * 35));
+    }
+
+    // Step 3: the actual OCR + declaration extraction + rule-engine
+    // evaluation, all in a single backend call. This is one real
+    // in-flight request, shown as one in-progress row until it
+    // resolves - no fake sub-steps are invented for it.
+    row = addStepRow('Running OCR extraction, declaration matching & legal compliance evaluation...');
+    const processFormData = new FormData();
+    processFormData.append('barcode', state.barcodeData || ins.barcode || '');
+    const processed = await API.post(`/api/inspections/${ins.id}/process`, processFormData, true);
     state.activeInspection = processed;
+
+    const declCount = (processed.declarations || []).length;
+    const ruleCount = processed.rules_checked_count ?? (processed.compliance_results || []).length;
+    finishStepRow(
+      row,
+      `Extracted ${declCount} declaration${declCount === 1 ? '' : 's'} & evaluated ${ruleCount} applicable rule${ruleCount === 1 ? '' : 's'}`
+    );
+    setProgress(100);
 
     // Render results
     renderStructuredRecord(processed);

@@ -33,6 +33,7 @@ from ..services.ocr_service import OCRService
 from ..services.rule_engine import RuleEngine
 from ..services.report_service import ReportService
 from ..services.audit_service import log_event
+from ..core.deps import get_current_user
 
 router = APIRouter(prefix="/api/inspections", tags=["Inspections"])
 
@@ -50,13 +51,13 @@ def generate_report_code(db: Session) -> str:
 @router.post("", response_model=InspectionOut)
 def create_inspection(
     data: InspectionCreate,
-    user_id: int = 1,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     code = generate_inspection_code(db)
     inspection = Inspection(
         inspection_code=code,
-        user_id=user_id,
+        user_id=current_user.id,
         barcode=data.barcode,
         product_name=data.product_name or "Pending Scan",
         brand=data.brand or "Pending Extraction",
@@ -68,13 +69,10 @@ def create_inspection(
     db.commit()
     db.refresh(inspection)
 
-    user = db.query(User).filter(User.id == user_id).first()
-    user_email = user.email if user else "user@legallens.demo"
-
     log_event(
         db=db,
-        user_email=user_email,
-        user_role=user.role if user else "user",
+        user_email=current_user.email,
+        user_role=current_user.role,
         action="Inspection Created",
         entity_type="Inspection",
         entity_id=code,
@@ -250,10 +248,14 @@ def process_inspection(
 def list_inspections(
     user_id: Optional[int] = None,
     result_filter: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Citizens only ever see their own inspections; officers/admins may filter by any user_id."""
     query = db.query(Inspection)
-    if user_id:
+    if current_user.role == "user":
+        query = query.filter(Inspection.user_id == current_user.id)
+    elif user_id:
         query = query.filter(Inspection.user_id == user_id)
     if result_filter and result_filter != "All":
         query = query.filter(Inspection.overall_result == result_filter)

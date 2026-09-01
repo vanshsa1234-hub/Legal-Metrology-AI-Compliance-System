@@ -1,11 +1,13 @@
-# ai/ocr/ — Not yet implemented
+# ai/ocr/ — Real implementation lives in backend/, PaddleOCR upgrade pending
 
-This directory is reserved for a real, standalone ocr module (see
-docs/MetraAI_Final_Tech_Stack.pdf for the intended design). Today, a
-demo-grade stand-in for this concern lives inline in
-`backend/app/services/ocr_service.py`, which returns hardcoded data
-for a fixed set of demo barcodes rather than running real extraction.
+A real OCR pipeline now exists: `backend/app/services/ocr_service.py`
+runs OpenCV preprocessing + Tesseract text recognition + regex-based
+structured field extraction. It is genuinely functional, not a demo
+catalog.
 
-Roadmap: extract a real implementation into this directory and have
-`OCRService` call into it, without changing the API layer that
-already depends on `OCRService`. See docs/ROADMAP.md.
+What's still pending, matching the original tech stack doc
+(docs/MetraAI_Final_Tech_Stack.pdf): swapping Tesseract for PaddleOCR
+for better multilingual/stylised-font accuracy. That only requires
+changing `OCRService._run_ocr()` - the rest of the pipeline (regex
+parsers, confidence scoring, callers) is engine-agnostic. See
+docs/ROADMAP.md.

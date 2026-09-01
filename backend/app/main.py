@@ -4,13 +4,14 @@ AI-Assisted Consumer Compliance & Product Inspection System
 Smart India Hackathon Prototype (Problem Statement 26034)
 """
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .database import engine, Base, SessionLocal
 from .core.config import STORAGE_DIR, IMAGES_DIR, EVIDENCE_DIR, REPORTS_DIR, FRONTEND_DIR, APP_NAME, APP_VERSION, APP_DESCRIPTION
+from .core.deps import get_current_user
 from .services.seed_data import seed_database
 from .api import (
     auth, analytics, inspections, images, ocr, declarations, compliance,
@@ -44,21 +45,29 @@ app.add_middleware(
 )
 
 # Register API Routers
+# auth.router is intentionally public (POST /login must be reachable
+# without a token; /me protects itself via its own Depends).
+# Every other router requires a valid JWT (Phase 1 - see
+# docs/PRODUCTION_READINESS_PRD.md). Stricter per-route role guards
+# (require_roles(...)) are layered on top inside individual routers
+# where an endpoint needs officer/admin only.
+_auth_required = [Depends(get_current_user)]
+
 app.include_router(auth.router)
-app.include_router(analytics.router)
-app.include_router(inspections.router)
-app.include_router(images.router)
-app.include_router(ocr.router)
-app.include_router(ocr.preview_router)
-app.include_router(declarations.router)
-app.include_router(compliance.router)
-app.include_router(evidence.router)
-app.include_router(violations.router)
-app.include_router(cases.router)
-app.include_router(products.router)
-app.include_router(rules.router)
-app.include_router(reports.router)
-app.include_router(audit.router)
+app.include_router(analytics.router, dependencies=_auth_required)
+app.include_router(inspections.router, dependencies=_auth_required)
+app.include_router(images.router, dependencies=_auth_required)
+app.include_router(ocr.router, dependencies=_auth_required)
+app.include_router(ocr.preview_router, dependencies=_auth_required)
+app.include_router(declarations.router, dependencies=_auth_required)
+app.include_router(compliance.router, dependencies=_auth_required)
+app.include_router(evidence.router, dependencies=_auth_required)
+app.include_router(violations.router, dependencies=_auth_required)
+app.include_router(cases.router, dependencies=_auth_required)
+app.include_router(products.router, dependencies=_auth_required)
+app.include_router(rules.router, dependencies=_auth_required)
+app.include_router(reports.router, dependencies=_auth_required)
+app.include_router(audit.router, dependencies=_auth_required)
 
 # Ensure storage directories exist
 os.makedirs(os.path.join(IMAGES_DIR, "products"), exist_ok=True)

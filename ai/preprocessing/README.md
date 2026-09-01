@@ -1,11 +1,8 @@
-# ai/preprocessing/ — Not yet implemented
+# ai/preprocessing/ — Real implementation lives in backend/
 
-This directory is reserved for a real, standalone preprocessing module (see
-docs/MetraAI_Final_Tech_Stack.pdf for the intended design). Today, a
-demo-grade stand-in for this concern lives inline in
-`backend/app/services/ocr_service.py`, which returns hardcoded data
-for a fixed set of demo barcodes rather than running real extraction.
-
-Roadmap: extract a real implementation into this directory and have
-`OCRService` call into it, without changing the API layer that
-already depends on `OCRService`. See docs/ROADMAP.md.
+Image quality scoring (blur via Laplacian variance, brightness,
+contrast, glare/overexposure) and OCR preprocessing (denoising,
+adaptive thresholding, upscaling) are implemented for real in
+`backend/app/services/ocr_service.py` (`evaluate_image_quality()` and
+`_run_ocr()`). See docs/ROADMAP.md for what's still planned beyond
+this (e.g. perspective correction).

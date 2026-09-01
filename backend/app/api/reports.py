@@ -7,18 +7,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Report, Inspection, Product
+from ..models import Report, Inspection, Product, User
 from ..schemas import ReportOut
+from ..core.deps import get_current_user
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
 @router.get("", response_model=List[ReportOut])
 def list_reports(
     user_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Citizens only ever see their own reports; officers/admins may filter by any user_id."""
     query = db.query(Report)
-    if user_id:
+    if current_user.role == "user":
+        query = query.filter(Report.user_id == current_user.id)
+    elif user_id:
         query = query.filter(Report.user_id == user_id)
     
     reports = query.order_by(Report.created_at.desc()).all()

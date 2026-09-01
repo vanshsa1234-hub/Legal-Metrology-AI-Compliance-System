@@ -17,6 +17,7 @@ from ..core.config import EVIDENCE_DIR
 from ..models import Request, OfficerAction, Inspection, User
 from ..schemas import RequestOut, RequestCreate, OfficerActionCreate
 from ..services.audit_service import log_event
+from ..core.deps import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/requests", tags=["Cases"])
 
@@ -29,10 +30,11 @@ def generate_request_code(db: Session) -> str:
 @router.post("", response_model=RequestOut)
 def create_request(
     data: RequestCreate,
-    user_id: int = 1,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Citizen raises a compliance request / complaint."""
+    user_id = current_user.id
     code = generate_request_code(db)
     req = Request(
         request_code=code,
@@ -64,11 +66,10 @@ def create_request(
     db.commit()
     db.refresh(req)
 
-    user = db.query(User).filter(User.id == user_id).first()
     log_event(
         db=db,
-        user_email=user.email if user else "user@legallens.demo",
-        user_role=user.role if user else "user",
+        user_email=current_user.email,
+        user_role=current_user.role,
         action="Request Raised",
         entity_type="Request",
         entity_id=code,
@@ -122,11 +123,19 @@ def list_requests(
     status_filter: Optional[str] = None,
     priority_filter: Optional[str] = None,
     search: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List raised requests with search & filters."""
+    """
+    List raised requests with search & filters.
+    Citizens ('user' role) only ever see their own requests, regardless
+    of the user_id query param. Officers/admins may view any user's
+    requests (or all, when user_id is omitted).
+    """
     query = db.query(Request)
-    if user_id:
+    if current_user.role == "user":
+        query = query.filter(Request.user_id == current_user.id)
+    elif user_id:
         query = query.filter(Request.user_id == user_id)
     if status_filter and status_filter != "All":
         query = query.filter(Request.status == status_filter)
@@ -153,11 +162,15 @@ def get_request(request_id: int, db: Session = Depends(get_db)):
     return req
 
 
-@router.post("/{request_id}/action", response_model=RequestOut)
+@router.post(
+    "/{request_id}/action",
+    response_model=RequestOut,
+    dependencies=[Depends(require_roles("officer", "admin"))],
+)
 def record_officer_action(
     request_id: int,
     action_data: OfficerActionCreate,
-    officer_id: int = 2,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Officer reviews request, records official remarks, and updates status."""
@@ -165,8 +178,8 @@ def record_officer_action(
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
 
-    officer = db.query(User).filter(User.id == officer_id).first()
-    officer_name = officer.full_name if officer else "Enforcement Officer"
+    officer_id = current_user.id
+    officer_name = current_user.full_name
 
     old_status = req.status
     req.status = action_data.new_status
@@ -200,7 +213,7 @@ def record_officer_action(
 
     log_event(
         db=db,
-        user_email=officer.email if officer else "admin@legallens.demo",
+        user_email=current_user.email,
         user_role="officer",
         action="Officer Action Recorded",
         entity_type="Request",

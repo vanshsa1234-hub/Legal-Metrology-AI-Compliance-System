@@ -6,6 +6,7 @@ the codebase never hardcodes a path. All paths are computed relative to
 this file's location, so the project can be cloned/moved anywhere.
 """
 import os
+import warnings
 
 # backend/app/core/config.py -> backend/app/core -> backend/app -> backend
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -34,3 +35,19 @@ FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 APP_NAME = "Legal Lens"
 APP_VERSION = "1.0.0"
 APP_DESCRIPTION = "AI-Assisted Consumer Compliance & Packaged Product Inspection Platform"
+
+# --- Auth (Phase 1: docs/PRODUCTION_READINESS_PRD.md) ---
+# JWT_SECRET_KEY must be set via env in any non-local deployment. The
+# fallback below is only for local/dev convenience and is intentionally
+# obvious so it's never mistaken for a real secret.
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-only-insecure-secret-change-me")
+JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
+JWT_EXPIRE_MINUTES = int(os.environ.get("JWT_EXPIRE_MINUTES", "60"))
+
+if JWT_SECRET_KEY == "dev-only-insecure-secret-change-me":
+    warnings.warn(
+        "JWT_SECRET_KEY is not set - using an insecure development "
+        "default. Set JWT_SECRET_KEY in the environment before "
+        "deploying anywhere beyond a local demo.",
+        RuntimeWarning,
+    )

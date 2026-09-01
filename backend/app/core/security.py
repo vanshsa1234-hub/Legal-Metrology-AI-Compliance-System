@@ -1,33 +1,57 @@
 """
 Legal Lens - Security Utilities
 
-IMPORTANT (read before demoing to judges or handling real user data):
-This module currently implements DEMO-GRADE auth only:
-  - Passwords are hashed with unsalted SHA-256 (hash_password).
-  - "Tokens" are opaque, unsigned strings (generate_session_token) and are
-    NOT verified on any protected route today - every API endpoint is
-    effectively open right now.
+Phase 1 (see docs/PRODUCTION_READINESS_PRD.md):
+  - Passwords are salted + hashed with bcrypt via passlib.
+  - Session tokens are signed, verifiable JWTs (python-jose), carrying
+    the user id and role, with an expiry.
+  - Verification lives in core/deps.py as a FastAPI dependency
+    (get_current_user / require_roles) enforced on protected routers
+    in main.py.
 
-Before production use, replace this with:
-  - Salted password hashing via passlib (bcrypt or argon2).
-  - Signed, verifiable JWTs via python-jose, with a get_current_user()
-    dependency enforced on every protected router.
-  - Role-based access control (RBAC) checks per route/action.
-
-See docs/ROADMAP.md for the tracked list of what still needs to be built.
+Existing rows created before this change (SHA-256 hex digests) will no
+longer verify against bcrypt - re-seed the database
+(delete backend/legallens.db and restart) after upgrading.
 """
-import hashlib
+import datetime
+from typing import Optional
+
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+from .config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRE_MINUTES
+
+_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    """Demo-grade password hashing. NOT suitable for production."""
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    """Salted bcrypt hash of a plaintext password."""
+    return _pwd_context.hash(password)
 
 
-def generate_session_token(user_id: int, role: str) -> str:
-    """
-    Generates an opaque session identifier for the demo prototype.
-    This is NOT a verifiable JWT and is not currently checked by any
-    route. Replace with a signed JWT before handling real credentials.
-    """
-    return f"legallens-token-{user_id}-{role}"
+def verify_password(plain_password: str, password_hash: str) -> bool:
+    """Check a plaintext password against a stored bcrypt hash."""
+    try:
+        return _pwd_context.verify(plain_password, password_hash)
+    except (ValueError, TypeError):
+        # Raised by passlib when password_hash isn't a bcrypt hash at
+        # all (e.g. a leftover SHA-256 digest from before this change).
+        return False
+
+
+def create_access_token(user_id: int, role: str, expires_minutes: Optional[int] = None) -> str:
+    """Issue a signed JWT carrying the user id and role."""
+    expire_minutes = expires_minutes if expires_minutes is not None else JWT_EXPIRE_MINUTES
+    expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=expire_minutes)
+    payload = {
+        "sub": str(user_id),
+        "role": role,
+        "exp": expire,
+        "iat": datetime.datetime.utcnow(),
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+def decode_access_token(token: str) -> dict:
+    """Decode and verify a JWT. Raises jose.JWTError on failure/expiry."""
+    return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
