@@ -77,12 +77,23 @@ gap anymore.
 - Migrate image/evidence/report upload+read paths to the abstraction.
 
 ## Phase 7 — Legal RAG / pgvector / LLM (stretch)
-- Enable `pgvector` extension on Postgres (depends on Phase 5).
-- Embed `rules/legal_rules/` + amendments into a vector table.
-- Add a retrieval endpoint + LLM-assisted ambiguity resolution for
-  edge cases the deterministic rule engine can't classify.
-- Out of scope until Phases 1–6 are stable; flagged here so it's not
-  lost.
+
+**Status: done.** Delivered as retrieval-first, LLM-optional:
+
+- `POST /api/rag/resolve` retrieves the legal rules most relevant to a
+  free-text compliance question via TF-IDF cosine similarity, computed
+  on the fly over the current rules table (`backend/app/services/rag_service.py`).
+- If `ANTHROPIC_API_KEY` is set, that retrieved evidence grounds a
+  short, rule-ID-cited answer via the Anthropic API. Without a key,
+  the endpoint still returns the retrieved rules - it never fabricates
+  an answer standing in for a real model call.
+- pgvector is enabled on Postgres via a genuinely safe migration
+  (a no-op on SQLite, confirmed with `alembic check`), available as a
+  drop-in upgrade path.
+- Deliberately *not* built: a persisted vector table or ANN index.
+  At today's scale (~30 rules) an in-Python similarity computation is
+  exact and sub-millisecond - that complexity wasn't earning its keep.
+  Revisit if the rules corpus grows into the thousands.
 
 ---
 

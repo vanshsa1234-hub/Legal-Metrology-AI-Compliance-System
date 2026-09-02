@@ -140,6 +140,12 @@ class TestLegalLensAPI(unittest.TestCase):
         )
         self.assertEqual(upload_res.status_code, 200)
         self.assertIn("quality_score", upload_res.json())
+        self.assertTrue(
+            upload_res.json()["file_url"].startswith("/uploads/images/products/"),
+            "Phase 6 (docs/PRODUCTION_READINESS_PRD.md): file_url should be resolved "
+            "through the storage abstraction (backend/app/services/storage.py), "
+            "not hand-built as a string"
+        )
 
         proc_res = self.client.post(
             f"/api/inspections/{ins_id}/process",
@@ -162,6 +168,87 @@ class TestLegalLensAPI(unittest.TestCase):
         self.assertEqual(report_res.status_code, 200)
         self.assertEqual(report_res.headers["content-type"], "application/pdf")
         self.assertGreater(len(report_res.content), 1000)
+
+        # Stashed for test_05c below (unittest gives each test method its
+        # own instance, so this needs to live on the class, not self).
+        TestLegalLensAPI.inspection_id_with_image = ins_id
+
+    def test_05c_evidence_file_endpoint_redirects_via_storage(self):
+        """Phase 6: image files are served through the storage abstraction, not a raw DB path."""
+        inspection_id = self.inspection_id_with_image
+
+        evidence_res = self.client.get(f"/api/evidence/inspection/{inspection_id}", headers=self.citizen_headers)
+        self.assertEqual(evidence_res.status_code, 200)
+        images = evidence_res.json()
+        self.assertGreater(len(images), 0)
+
+        file_res = self.client.get(
+            f"/api/evidence/{images[0]['id']}/file",
+            headers=self.citizen_headers,
+            follow_redirects=False
+        )
+        self.assertEqual(file_res.status_code, 307)
+        self.assertTrue(file_res.headers["location"].startswith("/uploads/"))
+
+    def test_05d_storage_abstraction_local_backend(self):
+        """
+        Phase 6 (docs/PRODUCTION_READINESS_PRD.md): unit-level check of
+        the storage abstraction itself, independent of the HTTP layer.
+        """
+        import io
+        from backend.app.services.storage import storage, LocalStorageBackend
+
+        self.assertIsInstance(storage, LocalStorageBackend, "No S3_BUCKET set locally - should default to local disk")
+
+        key = "images/products/_phase6_unit_test.txt"
+        storage.save(io.BytesIO(b"hello storage"), key)
+        resolved = storage.local_path(key)
+        self.assertIsNotNone(resolved)
+        with open(resolved, "rb") as f:
+            self.assertEqual(f.read(), b"hello storage")
+        self.assertEqual(storage.url(key), f"/uploads/{key}")
+        os.remove(resolved)
+
+    def test_05b_process_dispatches_through_celery_task(self):
+        """
+        Phase 4 (docs/PRODUCTION_READINESS_PRD.md): /process must go
+        through the Celery task, not run the old inline logic directly.
+        No REDIS_URL locally -> task runs eagerly and behaves exactly
+        like test_05's synchronous assertions (already covered there).
+        This test instead proves *queued* mode also works correctly,
+        by flipping task_always_eager off for the call.
+        """
+        from backend.app.workers.celery_app import celery_app
+
+        create_res = self.client.post("/api/inspections", json={
+            "barcode": "8901030383812",
+            "product_name": "Test Product for Queue Mode",
+        }, headers=self.citizen_headers)
+        ins_id = create_res.json()["id"]
+
+        celery_app.conf.task_always_eager = False
+        try:
+            proc_res = self.client.post(
+                f"/api/inspections/{ins_id}/process",
+                data={"barcode": "8901030383812"},
+                headers=self.citizen_headers
+            )
+        finally:
+            celery_app.conf.task_always_eager = True  # restore for the rest of the suite
+
+        self.assertEqual(proc_res.status_code, 200)
+        self.assertEqual(
+            proc_res.json()["status"], "Processing",
+            "In queued mode, /process should return immediately with status Processing, "
+            "not block for the full OCR + rule-evaluation run"
+        )
+
+        # Since no worker is actually consuming the queue in this test
+        # run, poll the read endpoint to confirm it still reflects the
+        # (unfinished) DB state rather than erroring.
+        status_res = self.client.get(f"/api/inspections/{ins_id}", headers=self.citizen_headers)
+        self.assertEqual(status_res.status_code, 200)
+        self.assertEqual(status_res.json()["status"], "Processing")
 
     @staticmethod
     def _build_synthetic_label_image() -> bytes:
@@ -292,6 +379,42 @@ class TestLegalLensAPI(unittest.TestCase):
 
         comp_res = self.client.get(f"/api/compliance/inspection/{ins_id}", headers=self.citizen_headers)
         self.assertEqual(comp_res.status_code, 200)
+
+    def test_10_rag_retrieval(self):
+        """
+        Phase 7, stretch (docs/PRODUCTION_READINESS_PRD.md): TF-IDF
+        retrieval over real legal rules, no LLM key required to work.
+        """
+        res = self.client.post(
+            "/api/rag/resolve",
+            json={"question": "what nutritional information must be printed on a food label?"},
+            headers=self.citizen_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertGreater(len(data["retrieved_rules"]), 0)
+        # The nutrition rule must genuinely rank first for a nutrition
+        # question - proves this is real similarity ranking, not a
+        # fixed/fabricated response list.
+        self.assertEqual(data["retrieved_rules"][0]["rule_id"], "LAB-NUT-001")
+        # No ANTHROPIC_API_KEY in the test environment - must fall back
+        # to retrieval only, never fabricate an "answer".
+        self.assertEqual(data["answer_source"], "retrieval_only")
+        self.assertIsNone(data["answer"])
+
+        # A query with no genuine overlap with any rule's text must
+        # return nothing, not a low-confidence guess dressed up as a match.
+        gibberish_res = self.client.post(
+            "/api/rag/resolve",
+            json={"question": "zzqx unrelated gibberish 12345"},
+            headers=self.citizen_headers
+        )
+        self.assertEqual(gibberish_res.json()["retrieved_rules"], [])
+        self.assertEqual(gibberish_res.json()["answer_source"], "no_relevant_rules")
+
+    def test_10b_rag_requires_auth(self):
+        res = self.client.post("/api/rag/resolve", json={"question": "anything"})
+        self.assertEqual(res.status_code, 401)
 
 
 if __name__ == "__main__":

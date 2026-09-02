@@ -20,6 +20,9 @@ storage/evidence/*
 !storage/evidence/.gitkeep
 storage/reports/*
 !storage/reports/.gitkeep
+# Phase 6 (docs/PRODUCTION_READINESS_PRD.md): local cache of files
+# downloaded from S3/MinIO when S3_BUCKET is set - regenerated on demand.
+storage/.s3-cache/
 backend/legallens.db
 
 # --- Node / frontend tooling (if introduced later) ---

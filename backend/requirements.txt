@@ -32,8 +32,19 @@ python-jose[cryptography]>=3.3.0
 # --- Testing ---
 httpx>=0.27.0
 
-# --- Planned, not yet used (see docs/PRODUCTION_READINESS_PRD.md) ---
-# celery                # background OCR/AI processing (backend/app/workers/)
-# redis                 # Celery broker
-# alembic                # schema migrations (backend/alembic/)
-# paddleocr / paddlepaddle  # upgrade path from Tesseract, per original tech stack doc
+# --- Background processing (Phase 4: docs/PRODUCTION_READINESS_PRD.md) ---
+celery>=5.3.0
+redis>=5.0.0
+
+# --- PostgreSQL + migrations (Phase 5: docs/PRODUCTION_READINESS_PRD.md) ---
+psycopg2-binary>=2.9.0
+alembic>=1.13.0
+
+# --- Object storage (Phase 6: docs/PRODUCTION_READINESS_PRD.md) ---
+# Only imported when S3_BUCKET is set (backend/app/services/storage.py);
+# local disk (default) needs no extra dependency.
+boto3>=1.34.0
+
+# --- Legal RAG (Phase 7, stretch: docs/PRODUCTION_READINESS_PRD.md) ---
+scikit-learn>=1.3.0
+# anthropic          # only needed if ANTHROPIC_API_KEY is set (backend/app/services/rag_service.py); retrieval works without it

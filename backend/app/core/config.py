@@ -15,8 +15,10 @@ BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__
 PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
 
 # --- Database ---
+# DATABASE_URL unset (local/dev/tests): SQLite file, zero setup needed.
+# DATABASE_URL set (docker-compose's postgres service, Phase 5): Postgres.
 DB_PATH = os.path.join(BACKEND_DIR, "legallens.db")
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 # --- Shared storage (matches the top-level storage/ directory) ---
 STORAGE_DIR = os.path.join(PROJECT_ROOT, "storage")

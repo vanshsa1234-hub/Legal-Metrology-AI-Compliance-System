@@ -48,8 +48,6 @@ import cv2
 import numpy as np
 import pytesseract
 
-from ..core.config import STORAGE_DIR
-
 # --- Regex patterns for structured field extraction -----------------------
 RE_MRP = re.compile(
     r"(?:MRP|M\.R\.P|Maximum\s+Retail\s+Price)[\s:.\u20b9]*"
@@ -93,17 +91,23 @@ class OCRService:
     """
 
     @staticmethod
-    def _resolve_filesystem_path(path_or_url: str) -> Optional[str]:
-        """Resolve a stored '/uploads/...' URL back to a real file on disk."""
-        if not path_or_url:
+    def _resolve_filesystem_path(path_or_key: str) -> Optional[str]:
+        """
+        Resolve a stored image reference to a real file on disk.
+
+        Backward-compatible with rows written before Phase 6 (raw
+        absolute paths, or "/uploads/..." URLs); new rows store a bare
+        storage key and are resolved via the storage abstraction
+        (backend/app/services/storage.py), which transparently handles
+        both local disk and S3/MinIO.
+        """
+        if not path_or_key:
             return None
-        if os.path.exists(path_or_url):
-            return path_or_url
-        if path_or_url.startswith("/uploads/"):
-            candidate = os.path.join(STORAGE_DIR, path_or_url[len("/uploads/"):])
-            if os.path.exists(candidate):
-                return candidate
-        return None
+        if os.path.exists(path_or_key):
+            return path_or_key
+        key = path_or_key[len("/uploads/"):] if path_or_key.startswith("/uploads/") else path_or_key
+        from .storage import storage
+        return storage.local_path(key)
 
     @staticmethod
     def evaluate_image_quality(image_path: str) -> Dict[str, Any]:

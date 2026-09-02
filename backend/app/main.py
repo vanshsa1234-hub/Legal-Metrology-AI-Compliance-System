@@ -15,11 +15,20 @@ from .core.deps import get_current_user
 from .services.seed_data import seed_database
 from .api import (
     auth, analytics, inspections, images, ocr, declarations, compliance,
-    evidence, violations, cases, products, rules, reports, audit
+    evidence, violations, cases, products, rules, reports, audit, rag
 )
 
 # Initialize database schema (models/__init__.py has already imported
-# every mapped class, so Base.metadata is fully populated here)
+# every mapped class, so Base.metadata is fully populated here).
+#
+# Phase 5 (docs/PRODUCTION_READINESS_PRD.md) added real Alembic
+# migrations (backend/alembic/) as the source of truth for schema
+# changes going forward. create_all() is left here too, deliberately:
+# it's a no-op against a DB Alembic already migrated (SQLAlchemy only
+# creates tables that don't exist yet), and it keeps `uvicorn app.main:app`
+# working with zero setup for local dev/tests against SQLite. Run
+# `alembic upgrade head` explicitly before starting the app in any
+# environment where migrations (not create_all) should own the schema.
 Base.metadata.create_all(bind=engine)
 
 # Run seed routine on startup
@@ -68,6 +77,7 @@ app.include_router(products.router, dependencies=_auth_required)
 app.include_router(rules.router, dependencies=_auth_required)
 app.include_router(reports.router, dependencies=_auth_required)
 app.include_router(audit.router, dependencies=_auth_required)
+app.include_router(rag.router, dependencies=_auth_required)
 
 # Ensure storage directories exist
 os.makedirs(os.path.join(IMAGES_DIR, "products"), exist_ok=True)
