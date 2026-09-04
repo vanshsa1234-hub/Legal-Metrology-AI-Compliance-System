@@ -18,12 +18,12 @@ This service now runs genuine computer vision and OCR:
     (green vs. brown/maroon square) on the front image.
 
 Known, honest limitations of this implementation (see docs/ROADMAP.md):
-  - Uses Tesseract, not PaddleOCR/YOLO as named in the original tech
-    stack doc. Tesseract is a real, general-purpose OCR engine and a
-    legitimate open-source choice, but it is less robust on stylised
-    packaging fonts and non-Latin scripts than PaddleOCR. Swapping the
-    engine only requires changing _run_ocr() below - everything else
-    (regex parsers, quality scoring, callers) is engine-agnostic.
+  - OCR engine is pluggable (backend/app/services/ocr_engines.py):
+    Tesseract by default (zero setup), PaddleOCR when
+    OCR_ENGINE=paddleocr is set and its package + model weights are
+    available (falls back to Tesseract otherwise, never a hard
+    failure). Swapping engines doesn't touch anything below this -
+    regex parsers, quality scoring, and every caller are engine-agnostic.
   - No YOLO region detection: this always OCRs the whole image rather
     than first localizing a "declaration panel" sub-region. In dense
     packaging layouts this can pick up promotional text alongside
@@ -46,7 +46,6 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import cv2
 import numpy as np
-import pytesseract
 
 # --- Regex patterns for structured field extraction -----------------------
 RE_MRP = re.compile(
@@ -179,7 +178,7 @@ class OCRService:
 
     @staticmethod
     def _run_ocr(image_path: str) -> Tuple[str, List[Dict[str, Any]]]:
-        """Run Tesseract on one image; return full text plus per-word records."""
+        """Preprocess one image, then hand it to the configured OCR engine (ocr_engines.py)."""
         img = cv2.imread(image_path)
         if img is None:
             return "", []
@@ -192,25 +191,8 @@ class OCRService:
         gray = cv2.fastNlMeansDenoising(gray, h=10)
         _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        full_text = pytesseract.image_to_string(thresh)
-
-        data = pytesseract.image_to_data(thresh, output_type=pytesseract.Output.DICT)
-        words = []
-        for i in range(len(data["text"])):
-            text = data["text"][i].strip()
-            conf = data["conf"][i]
-            try:
-                conf = float(conf)
-            except (ValueError, TypeError):
-                conf = -1.0
-            if text and conf >= 0:
-                words.append({
-                    "text": text,
-                    "confidence": conf,
-                    "bbox": [data["left"][i], data["top"][i], data["left"][i] + data["width"][i], data["top"][i] + data["height"][i]],
-                })
-
-        return full_text, words
+        from .ocr_engines import get_ocr_engine
+        return get_ocr_engine().recognize(thresh)
 
     @staticmethod
     def _detect_veg_mark(image_path: str) -> Tuple[str, float]:
@@ -337,7 +319,9 @@ class OCRService:
         all_words: List[Dict[str, Any]] = []
         image_height_for_name_guess = 0
         for img in resolved_images:
-            text, words = OCRService._run_ocr(img["path"])
+            from .package_detector import localize_package
+            ocr_input_path = localize_package(img["path"]) or img["path"]
+            text, words = OCRService._run_ocr(ocr_input_path)
             combined_text += "\n" + text
             all_words.extend(words)
             if img["type"] == "front":
@@ -360,16 +344,23 @@ class OCRService:
             found = OCRService._find_with_confidence(pattern, combined_text, all_words)
             if found:
                 value = found["value"]
+                confidence = found["confidence"]
                 if key == "net_quantity":
                     m = RE_NET_QTY.search(combined_text)
                     if m:
                         value = f"{m.group(1)} {m.group(2)}"
+                if key == "manufacturer":
+                    from .nlp_extraction import cross_check_manufacturer
+                    nlp_check = cross_check_manufacturer(combined_text, value, confidence)
+                    confidence = nlp_check["confidence"]
+                    if nlp_check["agrees"] is False:
+                        label = f"{label} (NLP cross-check disagrees - review recommended)"
                 result[key] = value
                 declarations.append({
                     "field_name": label,
                     "detected_value": value,
-                    "confidence": found["confidence"],
-                    "confidence_level": OCRService._confidence_level(found["confidence"]),
+                    "confidence": confidence,
+                    "confidence_level": OCRService._confidence_level(confidence),
                     "evidence_image_type": "front" if key in ("mrp", "net_quantity") else "back",
                     "bounding_box": str(found["bbox"]) if found["bbox"] else None,
                 })

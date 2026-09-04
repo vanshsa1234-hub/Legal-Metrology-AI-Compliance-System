@@ -31,7 +31,7 @@ from ..services.inspection_processing import next_report_code
 from ..services.storage import storage
 from ..workers.tasks import process_inspection_task
 from ..workers.celery_app import celery_app
-from ..core.deps import get_current_user
+from ..core.deps import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/inspections", tags=["Inspections"])
 
@@ -111,10 +111,22 @@ def process_inspection(
 def list_inspections(
     user_id: Optional[int] = None,
     result_filter: Optional[str] = None,
+    pending_review: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Citizens only ever see their own inspections; officers/admins may filter by any user_id."""
+    """
+    Citizens only ever see their own inspections; officers/admins may
+    filter by any user_id.
+
+    pending_review=true (officer/admin only) is the Phase 12
+    (docs/PRODUCTION_READINESS_PRD.md) "Final Evidence -> Human Review"
+    queue: every Review Required / Potential Non-Compliance inspection
+    still awaiting an officer verdict, independent of whether a citizen
+    has separately filed a complaint about it (POST /api/requests) -
+    that path existed before, this surfaces the ones nobody complained
+    about yet too.
+    """
     query = db.query(Inspection)
     if current_user.role == "user":
         query = query.filter(Inspection.user_id == current_user.id)
@@ -122,28 +134,77 @@ def list_inspections(
         query = query.filter(Inspection.user_id == user_id)
     if result_filter and result_filter != "All":
         query = query.filter(Inspection.overall_result == result_filter)
+    if pending_review:
+        if current_user.role not in ("officer", "admin"):
+            raise HTTPException(status_code=403, detail="Requires role: officer or admin")
+        query = query.filter(
+            Inspection.overall_result.in_(["Review Required", "Potential Non-Compliance"]),
+            Inspection.officer_review_status == "Pending",
+        )
 
     return query.order_by(Inspection.created_at.desc()).all()
 
 
 @router.get("/{inspection_id}", response_model=InspectionOut)
-def get_inspection(inspection_id: int, db: Session = Depends(get_db)):
+def get_inspection(inspection_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
     if not inspection:
         raise HTTPException(status_code=404, detail="Inspection not found")
+    if current_user.role == "user" and inspection.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this inspection")
+    return inspection
+
+
+@router.post("/{inspection_id}/review", response_model=InspectionOut, dependencies=[Depends(require_roles("officer", "admin"))])
+def record_officer_review(
+    inspection_id: int,
+    verdict: str = Form(...),
+    remarks: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Phase 12 (docs/PRODUCTION_READINESS_PRD.md): the "Human Review"
+    step directly on an inspection's assembled evidence (OCR output +
+    rule-engine results), independent of the citizen-complaint flow in
+    api/cases.py. verdict must be "Verified" or "Non-Compliance Confirmed".
+    """
+    if verdict not in ("Verified", "Non-Compliance Confirmed"):
+        raise HTTPException(status_code=400, detail="verdict must be 'Verified' or 'Non-Compliance Confirmed'")
+
+    inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+
+    inspection.officer_review_status = verdict
+    db.commit()
+    db.refresh(inspection)
+
+    log_event(
+        db=db,
+        user_email=current_user.email,
+        user_role=current_user.role,
+        action="Officer Review Recorded",
+        entity_type="Inspection",
+        entity_id=inspection.inspection_code,
+        details=f"Verdict: {verdict}" + (f" - {remarks}" if remarks else "")
+    )
     return inspection
 
 
 @router.get("/{inspection_id}/report")
-def download_inspection_report(inspection_id: int, db: Session = Depends(get_db)):
+def download_inspection_report(inspection_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    inspection_for_check = db.query(Inspection).filter(Inspection.id == inspection_id).first()
+    if not inspection_for_check:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+    if current_user.role == "user" and inspection_for_check.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this inspection's report")
+
     report = db.query(Report).filter(Report.inspection_id == inspection_id).first()
     resolved_path = storage.local_path(report.file_path) if report else None
 
     if not resolved_path:
-        inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
-        if not inspection:
-            raise HTTPException(status_code=404, detail="Inspection not found")
-
+        inspection = inspection_for_check
         product = db.query(Product).filter(Product.id == inspection.product_id).first()
         decs = db.query(ExtractedDeclaration).filter(ExtractedDeclaration.inspection_id == inspection_id).all()
         results = db.query(ComplianceResult).filter(ComplianceResult.inspection_id == inspection_id).all()

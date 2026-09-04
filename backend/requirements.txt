@@ -48,3 +48,29 @@ boto3>=1.34.0
 # --- Legal RAG (Phase 7, stretch: docs/PRODUCTION_READINESS_PRD.md) ---
 scikit-learn>=1.3.0
 # anthropic          # only needed if ANTHROPIC_API_KEY is set (backend/app/services/rag_service.py); retrieval works without it
+
+# --- OCR engine (Phase 9: docs/PRODUCTION_READINESS_PRD.md) ---
+# Tesseract (pytesseract, listed above) is the default and needs
+# nothing further. Uncomment below only if you want OCR_ENGINE=paddleocr
+# (backend/app/services/ocr_engines.py) - note its model weights are
+# downloaded on first use from an external host, so this needs a
+# network path to HuggingFace/ModelScope/AIStudio/BOS.
+# paddleocr>=2.7.0
+# paddlepaddle>=2.6.0
+
+# --- Package localization (Phase 10: docs/PRODUCTION_READINESS_PRD.md) ---
+# Only used when ENABLE_YOLO_LOCALIZATION is set; the classical-CV
+# fallback (backend/app/services/package_detector.py) needs nothing
+# beyond opencv-python-headless (listed above). ultralytics pulls in
+# torch as a hard dependency - a genuinely heavy install (GBs with
+# CUDA extras on some platforms); confirm you have room before
+# enabling this.
+# ultralytics>=8.2.0
+
+# --- NLP-assisted field extraction (Phase 11: docs/PRODUCTION_READINESS_PRD.md) ---
+# Cross-checks the regex-extracted manufacturer against spaCy's ORG
+# entities (backend/app/services/nlp_extraction.py) - lightweight,
+# no torch/CUDA. If not installed, cross-checking is silently skipped
+# and extraction falls back to regex-only (today's behavior).
+spacy>=3.7.0
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

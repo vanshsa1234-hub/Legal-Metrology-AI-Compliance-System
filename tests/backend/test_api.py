@@ -4,6 +4,7 @@ Smart India Hackathon Prototype Verification
 """
 import os
 import sys
+import time
 import unittest
 from fastapi.testclient import TestClient
 
@@ -415,6 +416,184 @@ class TestLegalLensAPI(unittest.TestCase):
     def test_10b_rag_requires_auth(self):
         res = self.client.post("/api/rag/resolve", json={"question": "anything"})
         self.assertEqual(res.status_code, 401)
+
+    def test_11c_package_localization_classical_cv_fallback(self):
+        """
+        Phase 10 (docs/PRODUCTION_READINESS_PRD.md): the classical-CV
+        fallback (no YOLO/torch dependency) must genuinely crop a
+        package-shaped foreground region and correctly decline to crop
+        a blank/no-foreground image.
+        """
+        import cv2
+        import numpy as np
+        from backend.app.services.package_detector import localize_package
+
+        img = np.full((600, 800, 3), 240, dtype=np.uint8)
+        cv2.rectangle(img, (200, 150), (600, 450), (50, 50, 50), -1)
+        pkg_path = "/tmp/_test_phase10_package.jpg"
+        cv2.imwrite(pkg_path, img)
+
+        cropped_path = localize_package(pkg_path)
+        self.assertIsNotNone(cropped_path)
+        cropped = cv2.imread(cropped_path)
+        self.assertLess(cropped.shape[0], img.shape[0])
+        self.assertLess(cropped.shape[1], img.shape[1])
+
+        blank = np.full((400, 400, 3), 200, dtype=np.uint8)
+        blank_path = "/tmp/_test_phase10_blank.jpg"
+        cv2.imwrite(blank_path, blank)
+        self.assertIsNone(
+            localize_package(blank_path),
+            "Must not fabricate a crop when there's no confident foreground region"
+        )
+
+    def test_11d_yolo_localization_off_by_default(self):
+        """ENABLE_YOLO_LOCALIZATION unset must skip YOLO entirely, not attempt a weight download."""
+        import backend.app.services.package_detector as detector_module
+        os.environ.pop("ENABLE_YOLO_LOCALIZATION", None)
+        self.assertIsNone(detector_module._yolo_crop_box("/tmp/_test_phase10_package.jpg"))
+
+    def test_11e_nlp_manufacturer_cross_check(self):
+        """
+        Phase 11 (docs/PRODUCTION_READINESS_PRD.md): spaCy NER must
+        genuinely raise confidence when it agrees with the regex-
+        extracted manufacturer, and genuinely lower it (with a review
+        flag) when an independent real ORG entity in the text
+        contradicts a bad regex guess - never a no-op cross-check.
+        """
+        from backend.app.services.nlp_extraction import cross_check_manufacturer
+
+        agree_text = "Manufactured by Haldiram Foods International Pvt Ltd, Nagpur."
+        agree_result = cross_check_manufacturer(agree_text, "Haldiram Foods International Pvt Ltd", 75.0)
+        self.assertTrue(agree_result["agrees"])
+        self.assertGreater(agree_result["confidence"], 75.0)
+
+        disagree_text = "Marketed and Manufactured by Britannia Industries Limited, Bangalore."
+        disagree_result = cross_check_manufacturer(disagree_text, "sfl93 Kkxz Ltd", 75.0)
+        self.assertFalse(disagree_result["agrees"])
+        self.assertLess(disagree_result["confidence"], 75.0)
+        self.assertIn("Britannia Industries Limited", disagree_result["org_entities"])
+
+    def test_12_human_review_stage(self):
+        """
+        Phase 12 (docs/PRODUCTION_READINESS_PRD.md): officers can
+        directly review a flagged inspection (Final Evidence -> Human
+        Review), independent of whether a citizen separately
+        complained about it via POST /api/requests.
+        """
+        # test_05's inspection is Review Required or worse and still
+        # Pending review - it hasn't gone through cases.py at all.
+        ins_id = self.inspection_id_with_image
+
+        # A citizen must not be able to record a review verdict (RBAC).
+        forbidden = self.client.post(
+            f"/api/inspections/{ins_id}/review",
+            data={"verdict": "Verified"},
+            headers=self.citizen_headers
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+        # Officer can.
+        review_res = self.client.post(
+            f"/api/inspections/{ins_id}/review",
+            data={"verdict": "Verified", "remarks": "Checked against physical sample."},
+            headers=self.officer_headers
+        )
+        self.assertEqual(review_res.status_code, 200)
+        self.assertEqual(review_res.json()["officer_review_status"], "Verified")
+
+        # Invalid verdict value is rejected.
+        bad_verdict = self.client.post(
+            f"/api/inspections/{ins_id}/review",
+            data={"verdict": "Looks Fine I Guess"},
+            headers=self.officer_headers
+        )
+        self.assertEqual(bad_verdict.status_code, 400)
+
+    def test_12b_pending_review_queue(self):
+        """The officer review queue must only be reachable by officers/admins."""
+        forbidden = self.client.get("/api/inspections?pending_review=true", headers=self.citizen_headers)
+        self.assertEqual(forbidden.status_code, 403)
+
+        allowed = self.client.get("/api/inspections?pending_review=true", headers=self.officer_headers)
+        self.assertEqual(allowed.status_code, 200)
+        for ins in allowed.json():
+            self.assertIn(ins["overall_result"], ("Review Required", "Potential Non-Compliance"))
+            self.assertEqual(ins["officer_review_status"], "Pending")
+
+    def test_12c_citizens_cannot_view_others_inspections(self):
+        """Phase 12 drive-by fix: get_inspection/report previously had no ownership check at all."""
+        ins_id = self.inspection_id_with_image  # belongs to the demo citizen (user@legallens.demo)
+
+        # Create a second, genuinely different citizen account directly
+        # in the DB (only one is seeded), then confirm it cannot see
+        # the first citizen's inspection - the real ownership check.
+        from backend.app.core.security import hash_password
+        db = SessionLocal()
+        try:
+            other_user = db.query(User).filter(User.email == "other-citizen@legallens.demo").first()
+            if not other_user:
+                other_user = User(
+                    email="other-citizen@legallens.demo",
+                    password_hash=hash_password("otherpass123"),
+                    full_name="Other Citizen",
+                    role="user",
+                    is_active=True,
+                )
+                db.add(other_user)
+                db.commit()
+        finally:
+            db.close()
+
+        other_login = self.client.post("/api/auth/login", json={
+            "email": "other-citizen@legallens.demo", "password": "otherpass123", "role": "user"
+        })
+        self.assertEqual(other_login.status_code, 200)
+        other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
+
+        denied = self.client.get(f"/api/inspections/{ins_id}", headers=other_headers)
+        self.assertEqual(denied.status_code, 403)
+
+        denied_report = self.client.get(f"/api/inspections/{ins_id}/report", headers=other_headers)
+        self.assertEqual(denied_report.status_code, 403)
+
+        # The actual owner and an officer must both still be able to view it.
+        owner_view = self.client.get(f"/api/inspections/{ins_id}", headers=self.citizen_headers)
+        self.assertEqual(owner_view.status_code, 200)
+        officer_view = self.client.get(f"/api/inspections/{ins_id}", headers=self.officer_headers)
+        self.assertEqual(officer_view.status_code, 200)
+
+
+    def test_11_ocr_engine_defaults_to_tesseract(self):
+        """Phase 9 (docs/PRODUCTION_READINESS_PRD.md): OCR_ENGINE unset must resolve to Tesseract."""
+        import backend.app.services.ocr_engines as engines_module
+        engines_module._engine_instance = None
+        os.environ.pop("OCR_ENGINE", None)
+        engine = engines_module.get_ocr_engine()
+        self.assertIsInstance(engine, engines_module.TesseractEngine)
+
+    def test_11b_ocr_engine_falls_back_when_paddleocr_unavailable(self):
+        """
+        Requesting OCR_ENGINE=paddleocr without a reachable weight host
+        (or the package missing) must fall back to Tesseract within a
+        bounded time, never hang or crash the request.
+        """
+        import backend.app.services.ocr_engines as engines_module
+        engines_module._engine_instance = None
+        original_timeout = engines_module.PADDLEOCR_INIT_TIMEOUT_SECONDS
+        engines_module.PADDLEOCR_INIT_TIMEOUT_SECONDS = 8  # keep the test fast
+        os.environ["OCR_ENGINE"] = "paddleocr"
+        try:
+            start = time.time()
+            engine = engines_module.get_ocr_engine()
+            elapsed = time.time() - start
+        finally:
+            os.environ.pop("OCR_ENGINE", None)
+            engines_module.PADDLEOCR_INIT_TIMEOUT_SECONDS = original_timeout
+            engines_module._engine_instance = None
+
+        self.assertIsInstance(engine, engines_module.TesseractEngine)
+        self.assertLess(elapsed, 30, "Fallback must be bounded by roughly the configured timeout, not hang for 50s+ on a slow/unreachable host")
 
 
 if __name__ == "__main__":

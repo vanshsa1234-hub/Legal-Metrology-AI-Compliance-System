@@ -4,6 +4,14 @@ Source of truth for remaining gaps: `docs/ROADMAP.md` (verified against
 actual code on 2026-08-31). This document sequences that work into
 buildable phases. Each phase is independently shippable and testable.
 
+**Status: all 12 phases below are complete, 28/28 backend tests
+passing.** This document is kept as the historical plan; for what each
+phase actually delivered (including honest caveats like PaddleOCR's
+weight download being unverified in the build/test sandbox, and YOLO
+only covering COCO's bottle/cup/bowl classes), see the "Genuinely
+working today" section of `docs/ROADMAP.md` — it's the more current,
+outcome-focused document of the two.
+
 Confirmed already done (not in scope below): real OCR (Tesseract +
 OpenCV), real image quality scoring, real rule engine, real PDF
 reports, real audit logging.
@@ -97,7 +105,80 @@ gap anymore.
 
 ---
 
-## Out of scope / explicitly deferred
+**All 7 phases above are complete.** Phases 8–12 below close the
+remaining gaps between the implementation and the target architecture
+(Frontend → FastAPI → Postgres/Redis/Celery → OpenCV/PaddleOCR/YOLO/
+NLP → Compliance Engine → RAG+Rules → Human Review → ReportLab →
+MinIO), based on a side-by-side review against that diagram.
+
+## Phase 8 — Full Stack as the Default Runtime Path
+Phases 4–6 made Postgres/Redis/MinIO real but *optional* (env-gated,
+falling back to SQLite/inline/local-disk when unset) - correct for
+zero-setup local dev, but it means the diagram's stack isn't what
+actually runs unless you remember to set env vars. This phase doesn't
+remove the fallback (still needed for the test suite), it makes the
+full stack the documented, one-command default:
+- A `backend/.env` generated/documented to match `docker-compose.yml`
+  exactly, so `docker compose up` *is* the default path, not a manual
+  opt-in.
+- README updated so "how do I run this" leads with `docker compose up`
+  (full stack), with bare `uvicorn` (SQLite/inline/local-disk) called
+  out as the lightweight fallback for local development only.
+
+## Phase 9 — Pluggable OCR Engine (Tesseract default, PaddleOCR optional)
+- Extract an `OCREngine` interface out of `ocr_service.py` so the
+  text-recognition step is swappable without touching the regex
+  parsers, quality scoring, or callers.
+- `TesseractEngine` (current behavior, default, zero extra setup).
+- `PaddleOCREngine` (used when `OCR_ENGINE=paddleocr` and the
+  `paddleocr` package + model weights are available), matching the
+  original tech-stack doc.
+- Honest caveat: PaddleOCR's model weights are hosted on Baidu's
+  `bcebos.com`, which isn't reachable from this sandbox's restricted
+  network, so the weight-download path can't be verified end-to-end
+  here the way Phase 10/11's GitHub-hosted weights can. The engine
+  abstraction and fallback logic are still fully real and tested;
+  only the actual PaddleOCR inference call is unverified in this
+  environment specifically.
+
+## Phase 10 — YOLO Product/Package Localization
+- Add a pretrained YOLOv8 (COCO-class) detection pass before OCR to
+  localize the physical product package in the photo and crop to it,
+  cutting out background/table/hand clutter before Tesseract runs.
+- Honest scope: this detects generic package/container classes
+  (bottle, box, etc.) that pretrained YOLO already knows - it does
+  **not** localize a "declaration panel" sub-region specifically,
+  since that's a custom object class with no existing labeled
+  training data. True declaration-panel detection would need a
+  labeling effort (a few hundred annotated package photos) before a
+  custom YOLO head could be trained - flagged as a follow-up, not
+  attempted here without that data.
+- Falls back to OCRing the full image (today's behavior) if YOLO
+  finds no package region, so this can only improve extraction
+  quality, never regress it.
+
+## Phase 11 — NLP-Assisted Field Extraction
+- Add spaCy (`en_core_web_sm`) as a second signal alongside the
+  existing regex/positional heuristics for product_name/brand/
+  manufacturer extraction - named-entity recognition (ORG, PRODUCT-like
+  spans) cross-checked against the position-based guess, raising
+  confidence when they agree and flagging for review when they don't,
+  rather than replacing the regex extraction (which handles
+  structured fields like MRP/dates/batch numbers that NER isn't suited
+  for) outright.
+
+## Phase 12 — Explicit "Final Evidence → Human Review" Stage
+- The diagram shows a distinct merge step between RAG+Rules and Human
+  Review, before ReportLab. Today that's implicit (a `ComplianceResult`
+  set plus a separately-triggered citizen request). This phase adds an
+  explicit `EvidenceBundle` assembly step that merges OCR output +
+  rule-engine results + (if queried) RAG-retrieved supporting rules
+  into one reviewable object *before* report generation, and surfaces
+  it as a distinct "Pending Human Review" state for
+  `Review Required`/`Potential Non-Compliance` inspections rather than
+  relying on the citizen to separately file a request to get officer
+  eyes on it.
+
 - Real barcode/camera hardware scanning (manual entry remains
   acceptable for this product's workflow — inspectors key in barcodes
   they read off physical packaging).
